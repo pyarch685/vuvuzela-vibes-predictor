@@ -8,6 +8,7 @@ import { TeamSelector } from '@/components/TeamSelector';
 import { VuvuzelaButton } from '@/components/VuvuzelaButton';
 import { PredictionResult } from '@/components/PredictionResult';
 import { FixtureCard } from '@/components/FixtureCard';
+import { Footer } from '@/components/Footer';
 import { SoundToggle, SoundProvider } from '@/components/SoundToggle';
 import { useToast } from '@/hooks/use-toast';
 
@@ -125,9 +126,7 @@ const Index = () => {
           </Tabs>
         </main>
 
-        <footer className="text-center py-6 text-muted-foreground relative z-10">
-          <p className="font-display">🇿🇦 Made with ❤️ in Mzansi ⚽</p>
-        </footer>
+        <Footer />
       </div>
     </SoundProvider>
   );
