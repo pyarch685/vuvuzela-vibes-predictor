@@ -1,8 +1,10 @@
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { UserFeedbackModal } from './UserFeedbackModal';
 
 interface FixtureCardProps {
+  id?: number;
   homeTeam: string;
   awayTeam: string;
   date: string;
@@ -18,6 +20,7 @@ interface FixtureCardProps {
 }
 
 export const FixtureCard = ({
+  id = 0,
   homeTeam,
   awayTeam,
   date,
@@ -74,7 +77,7 @@ export const FixtureCard = ({
           </div>
         )}
 
-        {/* Prediction preview */}
+        {/* Prediction preview and feedback */}
         {prediction && (
           <div className="mt-3 pt-3 border-t border-border/50">
             <div className="flex justify-between items-center text-sm">
@@ -89,6 +92,15 @@ export const FixtureCard = ({
             </div>
           </div>
         )}
+
+        {/* User Feedback Button */}
+        <div className="mt-3 flex justify-center">
+          <UserFeedbackModal 
+            fixtureId={id} 
+            homeTeam={homeTeam} 
+            awayTeam={awayTeam} 
+          />
+        </div>
       </div>
     </Card>
   );
