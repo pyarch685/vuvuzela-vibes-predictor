@@ -10,6 +10,7 @@ import { PredictionResult } from '@/components/PredictionResult';
 import { FixtureCard } from '@/components/FixtureCard';
 import { Footer } from '@/components/Footer';
 import { SoundToggle, SoundProvider } from '@/components/SoundToggle';
+import { NavHeader } from '@/components/NavHeader';
 import { useToast } from '@/hooks/use-toast';
 
 const PSL_TEAMS = [
@@ -68,6 +69,7 @@ const Index = () => {
   return (
     <SoundProvider>
       <div className="min-h-screen stadium-gradient relative overflow-hidden">
+        <NavHeader />
         <Confetti />
         <FloatingElements />
         <SoundToggle />
