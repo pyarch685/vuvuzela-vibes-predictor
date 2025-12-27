@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Confetti } from '@/components/Confetti';
 import { FloatingElements } from '@/components/FloatingElements';
@@ -12,19 +12,8 @@ import { Footer } from '@/components/Footer';
 import { SoundToggle, SoundProvider } from '@/components/SoundToggle';
 import { NavHeader } from '@/components/NavHeader';
 import { useToast } from '@/hooks/use-toast';
-import { getPrediction, getFixtures, getModelStatus, Fixture, ModelStatus } from '@/lib/api';
+import { getPrediction, getFixtures, getModelStatus, getTeams, Fixture, ModelStatus, Team, isAuthenticated } from '@/lib/api';
 import { Loader2 } from 'lucide-react';
-
-const PSL_TEAMS = [
-  { name: 'Kaizer Chiefs', value: 'kaizer_chiefs' },
-  { name: 'Orlando Pirates', value: 'orlando_pirates' },
-  { name: 'Mamelodi Sundowns', value: 'mamelodi_sundowns' },
-  { name: 'AmaZulu FC', value: 'amazulu' },
-  { name: 'Cape Town City', value: 'cape_town_city' },
-  { name: 'SuperSport United', value: 'supersport_united' },
-  { name: 'Golden Arrows', value: 'golden_arrows' },
-  { name: 'Stellenbosch FC', value: 'stellenbosch' },
-];
 
 const Index = () => {
   const [homeTeam, setHomeTeam] = useState('');
@@ -35,29 +24,119 @@ const Index = () => {
   const [fixturesLoading, setFixturesLoading] = useState(false);
   const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [teamsLoading, setTeamsLoading] = useState(true);
   const { toast } = useToast();
 
-  // Fetch fixtures on mount
+  // Fetch teams on mount
   useEffect(() => {
-    const fetchFixtures = async () => {
-      setFixturesLoading(true);
+    const fetchTeams = async () => {
+      setTeamsLoading(true);
       try {
-        const data = await getFixtures();
-        setFixtures(data);
+        const data = await getTeams();
+        setTeams(data);
       } catch (error) {
-        console.log('Backend not available, using mock data');
-        // Fallback mock data
-        setFixtures([
-          { id: 1, home_team: 'Kaizer Chiefs', away_team: 'Orlando Pirates', date: '2024-03-15', time: '15:30', venue: 'FNB Stadium', is_hot_match: true },
-          { id: 2, home_team: 'Mamelodi Sundowns', away_team: 'AmaZulu FC', date: '2024-03-16', time: '17:00', venue: 'Loftus Versfeld' },
-          { id: 3, home_team: 'Cape Town City', away_team: 'SuperSport United', date: '2024-03-17', time: '15:00', venue: 'Cape Town Stadium' },
+        console.log('Backend not available, using fallback teams');
+        // Fallback teams if backend unavailable
+        setTeams([
+          { name: 'Kaizer Chiefs', value: 'kaizer_chiefs' },
+          { name: 'Orlando Pirates', value: 'orlando_pirates' },
+          { name: 'Mamelodi Sundowns', value: 'mamelodi_sundowns' },
+          { name: 'AmaZulu FC', value: 'amazulu' },
+          { name: 'Cape Town City', value: 'cape_town_city' },
+          { name: 'SuperSport United', value: 'supersport_united' },
+          { name: 'Golden Arrows', value: 'golden_arrows' },
+          { name: 'Stellenbosch FC', value: 'stellenbosch' },
         ]);
       } finally {
-        setFixturesLoading(false);
+        setTeamsLoading(false);
       }
     };
-    fetchFixtures();
+    fetchTeams();
   }, []);
+
+  // Track if we've attempted to fetch fixtures
+  const hasFetchedRef = useRef(false);
+  
+  // Fetch fixtures on mount and when authentication changes
+  useEffect(() => {
+    let mounted = true;
+    
+    const fetchFixtures = async () => {
+      // Only fetch fixtures if user is authenticated
+      if (!isAuthenticated()) {
+        if (mounted) {
+          setFixtures([]);
+          setFixturesLoading(false);
+          hasFetchedRef.current = false;
+        }
+        return;
+      }
+
+      // Don't fetch if we already have fixtures or are currently loading
+      if (hasFetchedRef.current && fixtures.length > 0) {
+        return;
+      }
+
+      if (mounted) {
+        setFixturesLoading(true);
+        hasFetchedRef.current = true;
+      }
+      
+      try {
+        const data = await getFixtures(90, 5); // Get next 5 fixtures (90 days to catch future fixtures)
+        if (mounted) {
+          setFixtures(data);
+          console.log('Fixtures loaded successfully:', data.length);
+        }
+      } catch (error) {
+        console.error('Failed to fetch fixtures:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to load fixtures';
+        if (mounted) {
+          hasFetchedRef.current = false; // Allow retry on error
+          if (errorMessage.includes('Authentication required') || errorMessage.includes('401')) {
+            setFixtures([]);
+            // User needs to log in - fixtures will be empty
+          } else {
+            // Other error - show empty state
+            setFixtures([]);
+          }
+        }
+      } finally {
+        if (mounted) {
+          setFixturesLoading(false);
+        }
+      }
+    };
+    
+    // Initial fetch
+    fetchFixtures();
+    
+    // Listen for storage changes (when token is added/removed in other tabs)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'auth_token') {
+        hasFetchedRef.current = false; // Reset to allow fetch
+        fetchFixtures();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also check periodically (every 5 seconds) for same-tab auth changes
+    // This handles the case where login happens in the same tab
+    const interval = setInterval(() => {
+      if (isAuthenticated() && !hasFetchedRef.current) {
+        // Only fetch if we haven't fetched yet
+        fetchFixtures();
+      }
+    }, 5000);
+    
+    return () => {
+      mounted = false;
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, []); // Empty dependency array - only run on mount
 
   // Fetch model status
   const fetchModelStatus = async () => {
@@ -84,7 +163,11 @@ const Index = () => {
 
     setIsLoading(true);
     try {
-      const result = await getPrediction(homeTeam, awayTeam);
+      // Get team names from teams list
+      const homeTeamName = teams.find(t => t.value === homeTeam)?.name || homeTeam;
+      const awayTeamName = teams.find(t => t.value === awayTeam)?.name || awayTeam;
+      
+      const result = await getPrediction(homeTeamName, awayTeamName);
       setPrediction({
         homeTeam: result.home_team,
         awayTeam: result.away_team,
@@ -106,8 +189,8 @@ const Index = () => {
       const awayWin = 1 - homeWin - draw;
       const max = Math.max(homeWin, draw, awayWin);
       setPrediction({
-        homeTeam: PSL_TEAMS.find(t => t.value === homeTeam)?.name,
-        awayTeam: PSL_TEAMS.find(t => t.value === awayTeam)?.name,
+        homeTeam: teams.find(t => t.value === homeTeam)?.name || homeTeam,
+        awayTeam: teams.find(t => t.value === awayTeam)?.name || awayTeam,
         homeWin, draw, awayWin,
         prediction: max === homeWin ? 'Home Win' : max === draw ? 'Draw' : 'Away Win',
         confidence: max > 0.5 ? 'High' : max > 0.4 ? 'Medium' : 'Low',
@@ -147,15 +230,23 @@ const Index = () => {
 
             <TabsContent value="predict" className="space-y-6">
               <StadiumCard title="Single Match Prediction">
-                <div className="grid md:grid-cols-2 gap-6 mb-6">
-                  <TeamSelector teams={PSL_TEAMS} value={homeTeam} onChange={setHomeTeam} label="Home Team" placeholder="Select home team" />
-                  <TeamSelector teams={PSL_TEAMS} value={awayTeam} onChange={setAwayTeam} label="Away Team" placeholder="Select away team" />
-                </div>
-                <div className="flex justify-center">
-                  <VuvuzelaButton onClick={handlePredict} isLoading={isLoading} className="px-12 py-6 text-xl">
-                    Get Prediction
-                  </VuvuzelaButton>
-                </div>
+                {teamsLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-secondary" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid md:grid-cols-2 gap-6 mb-6">
+                      <TeamSelector teams={teams} value={homeTeam} onChange={setHomeTeam} label="Home Team" placeholder="Select home team" />
+                      <TeamSelector teams={teams} value={awayTeam} onChange={setAwayTeam} label="Away Team" placeholder="Select away team" />
+                    </div>
+                    <div className="flex justify-center">
+                      <VuvuzelaButton onClick={handlePredict} isLoading={isLoading} disabled={teamsLoading || teams.length === 0} className="px-12 py-6 text-xl">
+                        Get Prediction
+                      </VuvuzelaButton>
+                    </div>
+                  </>
+                )}
               </StadiumCard>
 
               {prediction && <PredictionResult {...prediction} />}

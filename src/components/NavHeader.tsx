@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { User, LogIn } from 'lucide-react';
+import { User, LogIn, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -9,25 +9,75 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { registerUser, loginUser, logoutUser, isAuthenticated } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 export const NavHeader = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loginError, setLoginError] = useState('');
+  const [registerError, setRegisterError] = useState('');
+  const [loggedIn, setLoggedIn] = useState(isAuthenticated());
+  const { toast } = useToast();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement login logic
-    console.log('Login:', { email, password });
-    setIsLoginOpen(false);
+    setLoginError('');
+    setIsLoading(true);
+    
+    try {
+      const result = await loginUser(email, password);
+      setLoggedIn(true);
+      toast({
+        title: 'Welcome back!',
+        description: result.message,
+      });
+      setIsLoginOpen(false);
+      setEmail('');
+      setPassword('');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Login failed';
+      setLoginError(errorMessage);
+      toast({
+        title: 'Login failed',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement register logic
-    console.log('Register:', { email, password });
-    setIsRegisterOpen(false);
+    setRegisterError('');
+    setIsLoading(true);
+    
+    try {
+      const result = await registerUser(email, password);
+      toast({
+        title: 'Account created!',
+        description: result.message,
+      });
+      setIsRegisterOpen(false);
+      setEmail('');
+      setPassword('');
+      // Switch to login dialog
+      setIsLoginOpen(true);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Registration failed';
+      setRegisterError(errorMessage);
+      toast({
+        title: 'Registration failed',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -41,8 +91,27 @@ export const NavHeader = () => {
 
         {/* Auth Buttons */}
         <div className="flex items-center gap-2">
-          {/* Login Dialog */}
-          <Dialog open={isLoginOpen} onOpenChange={setIsLoginOpen}>
+          {loggedIn ? (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="gap-2"
+              onClick={() => {
+                logoutUser();
+                setLoggedIn(false);
+                toast({
+                  title: 'Logged out',
+                  description: 'You have been successfully logged out.',
+                });
+              }}
+            >
+              <LogIn className="h-4 w-4" />
+              <span className="hidden sm:inline">Logout</span>
+            </Button>
+          ) : (
+            <>
+              {/* Login Dialog */}
+              <Dialog open={isLoginOpen} onOpenChange={setIsLoginOpen}>
             <DialogTrigger asChild>
               <Button variant="ghost" size="sm" className="gap-2">
                 <LogIn className="h-4 w-4" />
@@ -83,8 +152,18 @@ export const NavHeader = () => {
                     required
                   />
                 </div>
-                <Button type="submit" className="w-full">
-                  Login
+                {loginError && (
+                  <p className="text-sm text-destructive">{loginError}</p>
+                )}
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Logging in...
+                    </>
+                  ) : (
+                    'Login'
+                  )}
                 </Button>
                 <p className="text-center text-sm text-muted-foreground">
                   Don't have an account?{' '}
@@ -145,8 +224,21 @@ export const NavHeader = () => {
                     required
                   />
                 </div>
-                <Button type="submit" className="w-full">
-                  Create Account
+                {registerError && (
+                  <p className="text-sm text-destructive">{registerError}</p>
+                )}
+                <div className="text-xs text-muted-foreground mb-2">
+                  Password must: be 8+ characters, include uppercase, lowercase, digit, and special character
+                </div>
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating account...
+                    </>
+                  ) : (
+                    'Create Account'
+                  )}
                 </Button>
                 <p className="text-center text-sm text-muted-foreground">
                   Already have an account?{' '}
@@ -164,6 +256,8 @@ export const NavHeader = () => {
               </form>
             </DialogContent>
           </Dialog>
+            </>
+          )}
         </div>
       </div>
     </header>
