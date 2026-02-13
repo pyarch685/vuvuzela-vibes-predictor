@@ -20,6 +20,8 @@ export const useStadiumAmbiance = (enabled: boolean) => {
   }, []);
 
   const startSynthesized = useCallback(() => {
+    if (audioCtxRef.current) return;
+
     const ctx = new AudioContext();
     audioCtxRef.current = ctx;
 
@@ -27,7 +29,6 @@ export const useStadiumAmbiance = (enabled: boolean) => {
     masterGain.gain.value = 0;
     masterGain.connect(ctx.destination);
 
-    // Crowd noise
     const bufferSize = ctx.sampleRate * 4;
     const noiseBuffer = ctx.createBuffer(2, bufferSize, ctx.sampleRate);
     for (let ch = 0; ch < 2; ch++) {
@@ -59,7 +60,6 @@ export const useStadiumAmbiance = (enabled: boolean) => {
     crowdGain.connect(masterGain);
     noiseSource.start();
 
-    // Chant layer
     const chantNoise = ctx.createBufferSource();
     chantNoise.buffer = noiseBuffer;
     chantNoise.loop = true;
@@ -85,18 +85,20 @@ export const useStadiumAmbiance = (enabled: boolean) => {
     chantGain.connect(masterGain);
     chantNoise.start();
 
-    // Vuvuzela drone
     const vuvuzelaGain = ctx.createGain();
     vuvuzelaGain.gain.value = 0.25;
     vuvuzelaGain.connect(masterGain);
 
-    [233, 466, 699].forEach((freq, i) => {
+    const freqs = [233, 466, 699];
+    const levels = [0.5, 0.3, 0.15];
+
+    freqs.forEach((freq, i) => {
       const osc = ctx.createOscillator();
       osc.type = 'sawtooth';
       osc.frequency.value = freq + (Math.random() * 4 - 2);
 
       const oscGain = ctx.createGain();
-      oscGain.gain.value = [0.5, 0.3, 0.15][i];
+      oscGain.gain.value = levels[i];
 
       const wobble = ctx.createOscillator();
       wobble.frequency.value = 3 + Math.random() * 2;
@@ -117,20 +119,18 @@ export const useStadiumAmbiance = (enabled: boolean) => {
       osc.start();
     });
 
-    // Second detuned vuvuzela
-    const vuv2Gain = ctx.createGain();
-    vuv2Gain.gain.value = 0.15;
-    vuv2Gain.connect(masterGain);
-
     const osc2 = ctx.createOscillator();
     osc2.type = 'sawtooth';
     osc2.frequency.value = 237;
+    const vuv2Gain = ctx.createGain();
+    vuv2Gain.gain.value = 0.15;
     const f2 = ctx.createBiquadFilter();
     f2.type = 'bandpass';
     f2.frequency.value = 237;
     f2.Q.value = 6;
     osc2.connect(f2);
     f2.connect(vuv2Gain);
+    vuv2Gain.connect(masterGain);
     osc2.start();
 
     masterGain.gain.linearRampToValueAtTime(0.12, ctx.currentTime + 2);
@@ -141,7 +141,6 @@ export const useStadiumAmbiance = (enabled: boolean) => {
     if (isPlayingRef.current) return;
     isPlayingRef.current = true;
 
-    // Try fetching admin-uploaded audio from backend
     try {
       const audioUrl = await getStadiumAudioUrl();
       if (audioUrl) {
@@ -153,11 +152,10 @@ export const useStadiumAmbiance = (enabled: boolean) => {
         console.log('Stadium ambiance: playing admin-uploaded audio');
         return;
       }
-    } catch (err) {
-      console.log('No custom audio from backend, using synthesized fallback');
+    } catch {
+      console.log('No custom audio, using synthesized fallback');
     }
 
-    // Fallback to synthesized sound
     startSynthesized();
   }, [startSynthesized]);
 
