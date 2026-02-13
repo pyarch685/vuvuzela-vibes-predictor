@@ -1,15 +1,27 @@
 import { useEffect, useRef, useCallback } from 'react';
+import { getStadiumAudioUrl } from '@/lib/api';
 
 export const useStadiumAmbiance = (enabled: boolean) => {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const isPlayingRef = useRef(false);
 
-  const startAudio = useCallback(() => {
-    if (audioCtxRef.current) return;
+  const stopAll = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+      audioRef.current = null;
+    }
+    if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+      audioCtxRef.current.close();
+      audioCtxRef.current = null;
+    }
+    isPlayingRef.current = false;
+  }, []);
 
+  const startSynthesized = useCallback(() => {
     const ctx = new AudioContext();
     audioCtxRef.current = ctx;
-    isPlayingRef.current = true;
 
     const masterGain = ctx.createGain();
     masterGain.gain.value = 0;
@@ -78,16 +90,13 @@ export const useStadiumAmbiance = (enabled: boolean) => {
     vuvuzelaGain.gain.value = 0.25;
     vuvuzelaGain.connect(masterGain);
 
-    const vuvFreqs = [233, 466, 699];
-    const vuvLevels = [0.5, 0.3, 0.15];
-
-    vuvFreqs.forEach((freq, i) => {
+    [233, 466, 699].forEach((freq, i) => {
       const osc = ctx.createOscillator();
       osc.type = 'sawtooth';
       osc.frequency.value = freq + (Math.random() * 4 - 2);
 
       const oscGain = ctx.createGain();
-      oscGain.gain.value = vuvLevels[i];
+      oscGain.gain.value = [0.5, 0.3, 0.15][i];
 
       const wobble = ctx.createOscillator();
       wobble.frequency.value = 3 + Math.random() * 2;
@@ -124,32 +133,43 @@ export const useStadiumAmbiance = (enabled: boolean) => {
     f2.connect(vuv2Gain);
     osc2.start();
 
-    // Fade in
     masterGain.gain.linearRampToValueAtTime(0.12, ctx.currentTime + 2);
-
-    console.log('Stadium ambiance started');
+    console.log('Stadium ambiance: synthesized fallback started');
   }, []);
 
-  const stopAudio = useCallback(() => {
-    const ctx = audioCtxRef.current;
-    if (ctx && ctx.state !== 'closed') {
-      ctx.close().then(() => {
-        console.log('Stadium ambiance stopped');
-      });
+  const startAudio = useCallback(async () => {
+    if (isPlayingRef.current) return;
+    isPlayingRef.current = true;
+
+    // Try fetching admin-uploaded audio from backend
+    try {
+      const audioUrl = await getStadiumAudioUrl();
+      if (audioUrl) {
+        const audio = new Audio(audioUrl);
+        audio.loop = true;
+        audio.volume = 0.3;
+        audioRef.current = audio;
+        await audio.play();
+        console.log('Stadium ambiance: playing admin-uploaded audio');
+        return;
+      }
+    } catch (err) {
+      console.log('No custom audio from backend, using synthesized fallback');
     }
-    audioCtxRef.current = null;
-    isPlayingRef.current = false;
-  }, []);
+
+    // Fallback to synthesized sound
+    startSynthesized();
+  }, [startSynthesized]);
 
   useEffect(() => {
     if (enabled && !isPlayingRef.current) {
       startAudio();
     } else if (!enabled && isPlayingRef.current) {
-      stopAudio();
+      stopAll();
     }
 
     return () => {
-      stopAudio();
+      stopAll();
     };
-  }, [enabled, startAudio, stopAudio]);
+  }, [enabled, startAudio, stopAll]);
 };
