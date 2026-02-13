@@ -1,31 +1,21 @@
-import { useEffect, useRef } from 'react';
-
-interface AmbianceNodes {
-  masterGain: GainNode;
-}
+import { useEffect, useRef, useCallback } from 'react';
 
 export const useStadiumAmbiance = (enabled: boolean) => {
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const nodesRef = useRef<AmbianceNodes | null>(null);
+  const isPlayingRef = useRef(false);
 
-  useEffect(() => {
-    if (!enabled) {
-      if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
-        audioCtxRef.current.close();
-        audioCtxRef.current = null;
-        nodesRef.current = null;
-      }
-      return;
-    }
+  const startAudio = useCallback(() => {
+    if (audioCtxRef.current) return;
 
     const ctx = new AudioContext();
     audioCtxRef.current = ctx;
+    isPlayingRef.current = true;
 
     const masterGain = ctx.createGain();
     masterGain.gain.value = 0;
     masterGain.connect(ctx.destination);
 
-    // Crowd noise (filtered white noise)
+    // Crowd noise
     const bufferSize = ctx.sampleRate * 4;
     const noiseBuffer = ctx.createBuffer(2, bufferSize, ctx.sampleRate);
     for (let ch = 0; ch < 2; ch++) {
@@ -57,7 +47,7 @@ export const useStadiumAmbiance = (enabled: boolean) => {
     crowdGain.connect(masterGain);
     noiseSource.start();
 
-    // Rhythmic chant layer
+    // Chant layer
     const chantNoise = ctx.createBufferSource();
     chantNoise.buffer = noiseBuffer;
     chantNoise.loop = true;
@@ -83,7 +73,7 @@ export const useStadiumAmbiance = (enabled: boolean) => {
     chantGain.connect(masterGain);
     chantNoise.start();
 
-    // Vuvuzela drone (Bb ~233Hz + harmonics)
+    // Vuvuzela drone
     const vuvuzelaGain = ctx.createGain();
     vuvuzelaGain.gain.value = 0.25;
     vuvuzelaGain.connect(masterGain);
@@ -134,17 +124,32 @@ export const useStadiumAmbiance = (enabled: boolean) => {
     f2.connect(vuv2Gain);
     osc2.start();
 
-    nodesRef.current = { masterGain };
-
-    // Fade in over 2 seconds
+    // Fade in
     masterGain.gain.linearRampToValueAtTime(0.12, ctx.currentTime + 2);
 
+    console.log('Stadium ambiance started');
+  }, []);
+
+  const stopAudio = useCallback(() => {
+    const ctx = audioCtxRef.current;
+    if (ctx && ctx.state !== 'closed') {
+      ctx.close().then(() => {
+        console.log('Stadium ambiance stopped');
+      });
+    }
+    audioCtxRef.current = null;
+    isPlayingRef.current = false;
+  }, []);
+
+  useEffect(() => {
+    if (enabled && !isPlayingRef.current) {
+      startAudio();
+    } else if (!enabled && isPlayingRef.current) {
+      stopAudio();
+    }
+
     return () => {
-      if (ctx.state !== 'closed') {
-        ctx.close();
-      }
-      audioCtxRef.current = null;
-      nodesRef.current = null;
+      stopAudio();
     };
-  }, [enabled]);
+  }, [enabled, startAudio, stopAudio]);
 };
