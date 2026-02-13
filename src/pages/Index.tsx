@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { devLog, devError } from '@/lib/logger';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Confetti } from '@/components/Confetti';
 import { FloatingElements } from '@/components/FloatingElements';
@@ -36,7 +37,7 @@ const Index = () => {
         const data = await getTeams();
         setTeams(data);
       } catch (error) {
-        console.log('Backend not available, using fallback teams');
+        devLog('Backend not available, using fallback teams');
         // Fallback teams if backend unavailable
         setTeams([
           { name: 'Kaizer Chiefs', value: 'kaizer_chiefs' },
@@ -87,10 +88,10 @@ const Index = () => {
         const data = await getFixtures(90, 5); // Get next 5 fixtures (90 days to catch future fixtures)
         if (mounted) {
           setFixtures(data);
-          console.log('Fixtures loaded successfully:', data.length);
+          devLog('Fixtures loaded successfully:', data.length);
         }
       } catch (error) {
-        console.error('Failed to fetch fixtures:', error);
+        devError('Failed to fetch fixtures:', error);
         const errorMessage = error instanceof Error ? error.message : 'Failed to load fixtures';
         if (mounted) {
           hasFetchedRef.current = false; // Allow retry on error

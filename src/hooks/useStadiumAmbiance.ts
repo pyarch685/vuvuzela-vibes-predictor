@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { getStadiumAudioUrl } from '@/lib/api';
+import { devLog } from '@/lib/logger';
 
 export const useStadiumAmbiance = (enabled: boolean) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -134,7 +135,7 @@ export const useStadiumAmbiance = (enabled: boolean) => {
     osc2.start();
 
     masterGain.gain.linearRampToValueAtTime(0.12, ctx.currentTime + 2);
-    console.log('Stadium ambiance: synthesized fallback started');
+    devLog('Stadium ambiance: synthesized fallback started');
   }, []);
 
   const startAudio = useCallback(async () => {
@@ -149,11 +150,11 @@ export const useStadiumAmbiance = (enabled: boolean) => {
         audio.volume = 0.3;
         audioRef.current = audio;
         await audio.play();
-        console.log('Stadium ambiance: playing admin-uploaded audio');
+        devLog('Stadium ambiance: playing admin-uploaded audio');
         return;
       }
     } catch {
-      console.log('No custom audio, using synthesized fallback');
+      devLog('No custom audio, using synthesized fallback');
     }
 
     startSynthesized();
