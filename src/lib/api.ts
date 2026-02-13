@@ -456,6 +456,24 @@ export const getBenchmarkResults = async (): Promise<BenchmarkResponse> => {
   return response.json();
 };
 
+// Stadium Audio API
+export const getStadiumAudioUrl = async (): Promise<string | null> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/audio/stadium`, {
+      method: 'GET',
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    // Backend returns { url: "/audio/stadium/file" } or { url: "https://..." }
+    const url = data.url || null;
+    if (!url) return null;
+    // If relative URL, prefix with API base
+    return url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
+  } catch {
+    return null;
+  }
+};
+
 // Health Check
 export const checkHealth = async (): Promise<boolean> => {
   try {
