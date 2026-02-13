@@ -215,10 +215,10 @@ const Index = () => {
         <HeroSection />
 
         <div className="container mx-auto px-4 py-8 relative z-10">
-          <div className="flex justify-center gap-6 items-end">
+          <div className="flex justify-center gap-6 items-stretch">
             <SponsorPlaceholder side="left" />
             
-            <main className="w-full max-w-4xl">
+            <main className="w-full max-w-4xl flex flex-col">
               <Tabs defaultValue="predict" className="w-full">
                 <TabsList className="w-full grid grid-cols-3 bg-card/50 backdrop-blur-sm border-2 border-primary/30 p-1 mb-8">
                   <TabsTrigger value="predict" className="font-display text-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
