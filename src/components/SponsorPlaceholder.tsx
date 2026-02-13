@@ -4,7 +4,7 @@ interface SponsorPlaceholderProps {
 
 export const SponsorPlaceholder = ({ side }: SponsorPlaceholderProps) => {
   return (
-    <div className="hidden lg:flex flex-col gap-4 sticky top-24">
+    <div className="hidden lg:flex flex-col gap-4">
       {[1, 2, 3].map((i) => (
         <div
           key={i}
