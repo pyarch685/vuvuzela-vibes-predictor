@@ -35,7 +35,7 @@ export const TwitterSidebar = ({ twitterHandle = 'OfficialPSL' }: TwitterSidebar
   }, [isOpen, twitterHandle]);
 
   return (
-    <section className="container mx-auto px-4 py-8 relative z-10">
+    <section className="w-full max-w-4xl mx-auto px-4 py-8 relative z-10">
       {/* Header with toggle */}
       <button
         onClick={() => setIsOpen(!isOpen)}
