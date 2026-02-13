@@ -14,6 +14,7 @@ import { SoundToggle, SoundProvider } from '@/components/SoundToggle';
 import { NavHeader } from '@/components/NavHeader';
 import { TwitterSidebar } from '@/components/TwitterSidebar';
 import { SponsorPlaceholder } from '@/components/SponsorPlaceholder';
+import { SponsorBanner } from '@/components/SponsorBanner';
 import { useToast } from '@/hooks/use-toast';
 import { getPrediction, getFixtures, getModelStatus, getTeams, Fixture, ModelStatus, Team, isAuthenticated } from '@/lib/api';
 import { Loader2 } from 'lucide-react';
@@ -331,6 +332,7 @@ const Index = () => {
               <div className="mt-8">
                 <TwitterSidebar twitterHandle="OfficialPSL" />
               </div>
+              <SponsorBanner />
             </main>
 
             <SponsorPlaceholder side="right" />
