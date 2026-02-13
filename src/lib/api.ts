@@ -78,7 +78,8 @@ export const getPrediction = async (homeTeam: string, awayTeam: string): Promise
   });
 
   if (!response.ok) {
-    throw new Error(`Prediction failed: ${response.statusText}`);
+    console.error('Prediction request failed:', response.status, response.statusText);
+    throw new Error('Unable to generate prediction. Please try again later.');
   }
 
   const data = await response.json();
@@ -172,15 +173,12 @@ export const getFixtures = async (days: number = 14, limit: number = 5): Promise
   });
 
   if (!response.ok) {
-    const errorText = await response.text().catch(() => response.statusText);
-    let errorMessage = `Failed to fetch fixtures: ${response.status}`;
-    try {
-      const errorData = JSON.parse(errorText);
-      errorMessage = errorData.detail || errorMessage;
-    } catch {
-      errorMessage = errorText || errorMessage;
+    const errorText = await response.text().catch(() => '');
+    console.error('Fixtures request failed:', response.status, errorText);
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Session expired. Please log in again.');
     }
-    throw new Error(errorMessage);
+    throw new Error('Unable to load fixtures. Please try again later.');
   }
 
   const data = await response.json();
@@ -222,7 +220,8 @@ export const submitUserFeedback = async (feedback: UserFeedback): Promise<{ succ
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to submit feedback: ${response.statusText}`);
+    console.error('Feedback submission failed:', response.status, response.statusText);
+    throw new Error('Unable to submit feedback. Please try again later.');
   }
 
   return response.json();
@@ -238,7 +237,8 @@ export const getModelStatus = async (): Promise<ModelStatus> => {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch model status: ${response.statusText}`);
+    console.error('Model status request failed:', response.status, response.statusText);
+    throw new Error('Unable to fetch model status. Please try again later.');
   }
 
   const data = await response.json();
@@ -277,7 +277,8 @@ export const getTeams = async (): Promise<Team[]> => {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch teams: ${response.statusText}`);
+    console.error('Teams request failed:', response.status, response.statusText);
+    throw new Error('Unable to load teams. Please try again later.');
   }
 
   const data = await response.json();
@@ -301,7 +302,8 @@ export const getAboutContent = async (): Promise<string> => {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch about content: ${response.statusText}`);
+    console.error('About content request failed:', response.status, response.statusText);
+    throw new Error('Unable to load content. Please try again later.');
   }
 
   const data = await response.json();
@@ -317,7 +319,8 @@ export const getDisclaimerContent = async (): Promise<string> => {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch disclaimer content: ${response.statusText}`);
+    console.error('Disclaimer content request failed:', response.status, response.statusText);
+    throw new Error('Unable to load content. Please try again later.');
   }
 
   const data = await response.json();
@@ -333,7 +336,8 @@ export const getContactContent = async (): Promise<string> => {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch contact content: ${response.statusText}`);
+    console.error('Contact content request failed:', response.status, response.statusText);
+    throw new Error('Unable to load content. Please try again later.');
   }
 
   const data = await response.json();
@@ -375,8 +379,12 @@ export const registerUser = async (email: string, password: string): Promise<Reg
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: response.statusText }));
-    throw new Error(error.detail || `Registration failed: ${response.statusText}`);
+    const error = await response.json().catch(() => ({}));
+    console.error('Registration failed:', response.status, error);
+    if (response.status === 409 || error.detail?.toLowerCase().includes('exists')) {
+      throw new Error('An account with this email already exists.');
+    }
+    throw new Error('Registration failed. Please try again later.');
   }
 
   return response.json();
@@ -392,8 +400,12 @@ export const loginUser = async (email: string, password: string): Promise<LoginR
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: response.statusText }));
-    throw new Error(error.detail || `Login failed: ${response.statusText}`);
+    const error = await response.json().catch(() => ({}));
+    console.error('Login failed:', response.status, error);
+    if (response.status === 401) {
+      throw new Error('Invalid email or password.');
+    }
+    throw new Error('Login failed. Please try again later.');
   }
 
   const result = await response.json();
@@ -449,8 +461,9 @@ export const getBenchmarkResults = async (): Promise<BenchmarkResponse> => {
   });
 
   if (!response.ok) {
-    const errorText = await response.text().catch(() => response.statusText);
-    throw new Error(`Failed to fetch benchmark: ${errorText}`);
+    const errorText = await response.text().catch(() => '');
+    console.error('Benchmark request failed:', response.status, errorText);
+    throw new Error('Unable to load benchmark data. Please try again later.');
   }
 
   return response.json();
