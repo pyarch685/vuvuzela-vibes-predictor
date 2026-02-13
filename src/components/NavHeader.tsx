@@ -15,6 +15,7 @@ import { registerUser, loginUser, logoutUser, isAuthenticated } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast';
 
 export const NavHeader = () => {
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -27,21 +28,26 @@ export const NavHeader = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const resetForm = () => {
+    setUsername('');
+    setEmail('');
+    setPassword('');
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
     setIsLoading(true);
     
     try {
-      const result = await loginUser(email, password);
+      const result = await loginUser(username, email, password);
       setLoggedIn(true);
       toast({
         title: 'Welcome back!',
         description: result.message,
       });
       setIsLoginOpen(false);
-      setEmail('');
-      setPassword('');
+      resetForm();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Login failed';
       setLoginError(errorMessage);
@@ -61,14 +67,13 @@ export const NavHeader = () => {
     setIsLoading(true);
     
     try {
-      const result = await registerUser(email, password);
+      const result = await registerUser(username, email, password);
       toast({
         title: 'Account created!',
         description: result.message,
       });
       setIsRegisterOpen(false);
-      setEmail('');
-      setPassword('');
+      resetForm();
       // Switch to login dialog
       setIsLoginOpen(true);
     } catch (error) {
@@ -153,6 +158,19 @@ export const NavHeader = () => {
               </DialogHeader>
               <form onSubmit={handleLogin} className="space-y-4 mt-4">
                 <div className="space-y-2">
+                  <label htmlFor="login-username" className="text-sm font-medium">
+                    Username
+                  </label>
+                  <Input
+                    id="login-username"
+                    type="text"
+                    placeholder="your_username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
                   <label htmlFor="login-email" className="text-sm font-medium">
                     Email
                   </label>
@@ -224,6 +242,21 @@ export const NavHeader = () => {
                 </DialogTitle>
               </DialogHeader>
               <form onSubmit={handleRegister} className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <label htmlFor="register-username" className="text-sm font-medium">
+                    Username
+                  </label>
+                  <Input
+                    id="register-username"
+                    type="text"
+                    placeholder="Choose a username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    required
+                    minLength={3}
+                    maxLength={30}
+                  />
+                </div>
                 <div className="space-y-2">
                   <label htmlFor="register-email" className="text-sm font-medium">
                     Email

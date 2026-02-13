@@ -353,6 +353,7 @@ export const getContactContent = async (): Promise<string> => {
 
 // Authentication API
 export interface RegisterRequest {
+  username: string;
   email: string;
   password: string;
 }
@@ -364,6 +365,7 @@ export interface RegisterResponse {
 }
 
 export interface LoginRequest {
+  username: string;
   email: string;
   password: string;
 }
@@ -372,17 +374,18 @@ export interface LoginResponse {
   success: boolean;
   message: string;
   user_id?: number;
+  username?: string;
   access_token?: string;
   token_type?: string;
 }
 
-export const registerUser = async (email: string, password: string): Promise<RegisterResponse> => {
+export const registerUser = async (username: string, email: string, password: string): Promise<RegisterResponse> => {
   const response = await fetch(`${API_BASE_URL}/auth/register`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ username, email, password }),
   });
 
   if (!response.ok) {
@@ -397,13 +400,13 @@ export const registerUser = async (email: string, password: string): Promise<Reg
   return response.json();
 };
 
-export const loginUser = async (email: string, password: string): Promise<LoginResponse> => {
+export const loginUser = async (username: string, email: string, password: string): Promise<LoginResponse> => {
   const response = await fetch(`${API_BASE_URL}/auth/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ username, email, password }),
   });
 
   if (!response.ok) {
