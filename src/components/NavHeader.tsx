@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { User, LogIn, Loader2, BarChart3 } from 'lucide-react';
+import { SoundToggle } from '@/components/SoundToggle';
 import {
   Dialog,
   DialogContent,
@@ -114,7 +115,8 @@ export const NavHeader = () => {
         </div>
 
         {/* Auth Buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
+          <SoundToggle />
           {loggedIn ? (
             <Button 
               variant="ghost" 

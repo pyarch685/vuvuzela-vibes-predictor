@@ -206,7 +206,7 @@ const Index = () => {
         <NavHeader />
         <Confetti />
         <FloatingElements />
-        <SoundToggle />
+        
         
         <HeroSection />
 
