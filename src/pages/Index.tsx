@@ -12,6 +12,7 @@ import { FixtureCard } from '@/components/FixtureCard';
 import { Footer } from '@/components/Footer';
 import { SoundToggle, SoundProvider } from '@/components/SoundToggle';
 import { NavHeader } from '@/components/NavHeader';
+import { TwitterSidebar } from '@/components/TwitterSidebar';
 import { useToast } from '@/hooks/use-toast';
 import { getPrediction, getFixtures, getModelStatus, getTeams, Fixture, ModelStatus, Team, isAuthenticated } from '@/lib/api';
 import { Loader2 } from 'lucide-react';
@@ -324,6 +325,7 @@ const Index = () => {
         </main>
 
         <Footer />
+        <TwitterSidebar twitterHandle="OfficialPSL" />
       </div>
     </SoundProvider>
   );
