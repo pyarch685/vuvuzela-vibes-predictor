@@ -215,7 +215,7 @@ const Index = () => {
         <HeroSection />
 
         <div className="container mx-auto px-4 py-8 relative z-10">
-          <div className="flex justify-center gap-6">
+          <div className="flex justify-center gap-6 items-end">
             <SponsorPlaceholder side="left" />
             
             <main className="w-full max-w-4xl">
