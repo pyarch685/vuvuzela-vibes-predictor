@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { devLog, devError } from '@/lib/logger';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Confetti } from '@/components/Confetti';
 import { FloatingElements } from '@/components/FloatingElements';
@@ -11,6 +12,9 @@ import { FixtureCard } from '@/components/FixtureCard';
 import { Footer } from '@/components/Footer';
 import { SoundToggle, SoundProvider } from '@/components/SoundToggle';
 import { NavHeader } from '@/components/NavHeader';
+import { TwitterSidebar } from '@/components/TwitterSidebar';
+import { SponsorPlaceholder } from '@/components/SponsorPlaceholder';
+import { SponsorBanner } from '@/components/SponsorBanner';
 import { useToast } from '@/hooks/use-toast';
 import { getPrediction, getFixtures, getModelStatus, getTeams, Fixture, ModelStatus, Team, isAuthenticated } from '@/lib/api';
 import { Loader2 } from 'lucide-react';
@@ -36,7 +40,7 @@ const Index = () => {
         const data = await getTeams();
         setTeams(data);
       } catch (error) {
-        console.log('Backend not available, using fallback teams');
+        devLog('Backend not available, using fallback teams');
         // Fallback teams if backend unavailable
         setTeams([
           { name: 'Kaizer Chiefs', value: 'kaizer_chiefs' },
@@ -87,10 +91,10 @@ const Index = () => {
         const data = await getFixtures(90, 5); // Get next 5 fixtures (90 days to catch future fixtures)
         if (mounted) {
           setFixtures(data);
-          console.log('Fixtures loaded successfully:', data.length);
+          devLog('Fixtures loaded successfully:', data.length);
         }
       } catch (error) {
-        console.error('Failed to fetch fixtures:', error);
+        devError('Failed to fetch fixtures:', error);
         const errorMessage = error instanceof Error ? error.message : 'Failed to load fixtures';
         if (mounted) {
           hasFetchedRef.current = false; // Allow retry on error
@@ -206,122 +210,134 @@ const Index = () => {
         <NavHeader />
         <Confetti />
         <FloatingElements />
-        <SoundToggle />
+        
         
         <HeroSection />
 
-        <main className="container mx-auto px-4 py-8 relative z-10">
-          <Tabs defaultValue="predict" className="w-full max-w-4xl mx-auto">
-            <TabsList className="w-full grid grid-cols-3 bg-card/50 backdrop-blur-sm border-2 border-primary/30 p-1 mb-8">
-              <TabsTrigger value="predict" className="font-display text-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                📊 Predict
-              </TabsTrigger>
-              <TabsTrigger value="fixtures" className="font-display text-lg data-[state=active]:bg-secondary data-[state=active]:text-secondary-foreground">
-                📅 Fixtures
-              </TabsTrigger>
-              <TabsTrigger 
-                value="status" 
-                className="font-display text-lg data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
-                onClick={fetchModelStatus}
-              >
-                ⚙️ Status
-              </TabsTrigger>
-            </TabsList>
+        <div className="container mx-auto px-4 py-8 relative z-10">
+          <div className="flex justify-center gap-6 items-stretch">
+            <SponsorPlaceholder side="left" />
+            
+            <main className="w-full max-w-4xl flex flex-col">
+              <Tabs defaultValue="predict" className="w-full">
+                <TabsList className="w-full grid grid-cols-3 bg-card/50 backdrop-blur-sm border-2 border-primary/30 p-1 mb-8">
+                  <TabsTrigger value="predict" className="font-display text-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    📊 Predict
+                  </TabsTrigger>
+                  <TabsTrigger value="fixtures" className="font-display text-lg data-[state=active]:bg-secondary data-[state=active]:text-secondary-foreground">
+                    📅 Fixtures
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="status" 
+                    className="font-display text-lg data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
+                    onClick={fetchModelStatus}
+                  >
+                    ⚙️ Status
+                  </TabsTrigger>
+                </TabsList>
 
-            <TabsContent value="predict" className="space-y-6">
-              <StadiumCard title="Single Match Prediction">
-                {teamsLoading ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-secondary" />
-                  </div>
-                ) : (
-                  <>
-                    <div className="grid md:grid-cols-2 gap-6 mb-6">
-                      <TeamSelector teams={teams} value={homeTeam} onChange={setHomeTeam} label="Home Team" placeholder="Select home team" />
-                      <TeamSelector teams={teams} value={awayTeam} onChange={setAwayTeam} label="Away Team" placeholder="Select away team" />
-                    </div>
-                    <div className="flex justify-center">
-                      <VuvuzelaButton onClick={handlePredict} isLoading={isLoading} disabled={teamsLoading || teams.length === 0} className="px-12 py-6 text-xl">
-                        Get Prediction
-                      </VuvuzelaButton>
-                    </div>
-                  </>
-                )}
-              </StadiumCard>
-
-              {prediction && <PredictionResult {...prediction} />}
-            </TabsContent>
-
-            <TabsContent value="fixtures">
-              <StadiumCard title="Upcoming Fixtures">
-                {fixturesLoading ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-secondary" />
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {fixtures.map((fixture) => (
-                      <FixtureCard 
-                        key={fixture.id} 
-                        id={fixture.id}
-                        homeTeam={fixture.home_team} 
-                        awayTeam={fixture.away_team}
-                        date={fixture.date}
-                        time={fixture.time}
-                        venue={fixture.venue}
-                        isHotMatch={fixture.is_hot_match}
-                        prediction={fixture.prediction ? {
-                          homeWin: fixture.prediction.home_win,
-                          draw: fixture.prediction.draw,
-                          awayWin: fixture.prediction.away_win,
-                          predicted: fixture.prediction.predicted,
-                        } : undefined}
-                      />
-                    ))}
-                  </div>
-                )}
-              </StadiumCard>
-            </TabsContent>
-
-            <TabsContent value="status">
-              <StadiumCard title="Model Status">
-                {statusLoading ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-secondary" />
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <div className="text-6xl mb-4">
-                      {modelStatus?.status === 'ready' ? '✅' : modelStatus?.status === 'offline' ? '❌' : '🤖'}
-                    </div>
-                    <p className="text-xl text-secondary font-display capitalize">
-                      {modelStatus?.status || 'Click to check status'}
-                    </p>
-                    {modelStatus?.accuracy && (
-                      <p className="text-muted-foreground mt-2">
-                        Accuracy: {(modelStatus.accuracy * 100).toFixed(1)}%
-                      </p>
+                <TabsContent value="predict" className="space-y-6">
+                  <StadiumCard title="Single Match Prediction">
+                    {teamsLoading ? (
+                      <div className="flex justify-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-secondary" />
+                      </div>
+                    ) : (
+                      <>
+                        <div className="grid md:grid-cols-2 gap-6 mb-6">
+                          <TeamSelector teams={teams} value={homeTeam} onChange={setHomeTeam} label="Home Team" placeholder="Select home team" />
+                          <TeamSelector teams={teams} value={awayTeam} onChange={setAwayTeam} label="Away Team" placeholder="Select away team" />
+                        </div>
+                        <div className="flex justify-center">
+                          <VuvuzelaButton onClick={handlePredict} isLoading={isLoading} disabled={teamsLoading || teams.length === 0} className="px-12 py-6 text-xl">
+                            Get Prediction
+                          </VuvuzelaButton>
+                        </div>
+                      </>
                     )}
-                    {modelStatus?.last_trained && (
-                      <p className="text-muted-foreground mt-1">
-                        Last trained: {modelStatus.last_trained}
-                      </p>
-                    )}
-                    {modelStatus?.total_predictions && (
-                      <p className="text-muted-foreground mt-1">
-                        Total predictions: {modelStatus.total_predictions.toLocaleString()}
-                      </p>
-                    )}
-                    <p className="text-sm text-muted-foreground/70 mt-4">
-                      Backend: localhost:8000
-                    </p>
-                  </div>
-                )}
-              </StadiumCard>
-            </TabsContent>
-          </Tabs>
-        </main>
+                  </StadiumCard>
 
+                  {prediction && <PredictionResult {...prediction} />}
+                </TabsContent>
+
+                <TabsContent value="fixtures">
+                  <StadiumCard title="Upcoming Fixtures">
+                    {fixturesLoading ? (
+                      <div className="flex justify-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-secondary" />
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {fixtures.map((fixture) => (
+                          <FixtureCard 
+                            key={fixture.id} 
+                            id={fixture.id}
+                            homeTeam={fixture.home_team} 
+                            awayTeam={fixture.away_team}
+                            date={fixture.date}
+                            time={fixture.time}
+                            venue={fixture.venue}
+                            isHotMatch={fixture.is_hot_match}
+                            prediction={fixture.prediction ? {
+                              homeWin: fixture.prediction.home_win,
+                              draw: fixture.prediction.draw,
+                              awayWin: fixture.prediction.away_win,
+                              predicted: fixture.prediction.predicted,
+                            } : undefined}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </StadiumCard>
+                </TabsContent>
+
+                <TabsContent value="status">
+                  <StadiumCard title="Model Status">
+                    {statusLoading ? (
+                      <div className="flex justify-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-secondary" />
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <div className="text-6xl mb-4">
+                          {modelStatus?.status === 'ready' ? '✅' : modelStatus?.status === 'offline' ? '❌' : '🤖'}
+                        </div>
+                        <p className="text-xl text-secondary font-display capitalize">
+                          {modelStatus?.status || 'Click to check status'}
+                        </p>
+                        {modelStatus?.accuracy && (
+                          <p className="text-muted-foreground mt-2">
+                            Accuracy: {(modelStatus.accuracy * 100).toFixed(1)}%
+                          </p>
+                        )}
+                        {modelStatus?.last_trained && (
+                          <p className="text-muted-foreground mt-1">
+                            Last trained: {modelStatus.last_trained}
+                          </p>
+                        )}
+                        {modelStatus?.total_predictions && (
+                          <p className="text-muted-foreground mt-1">
+                            Total predictions: {modelStatus.total_predictions.toLocaleString()}
+                          </p>
+                        )}
+                        <p className="text-sm text-muted-foreground/70 mt-4">
+                          Backend: localhost:8000
+                        </p>
+                      </div>
+                    )}
+                  </StadiumCard>
+                </TabsContent>
+              </Tabs>
+
+              <div className="mt-8">
+                <TwitterSidebar twitterHandle="OfficialPSL" />
+              </div>
+              <SponsorBanner />
+            </main>
+
+            <SponsorPlaceholder side="right" />
+          </div>
+        </div>
         <Footer />
       </div>
     </SoundProvider>

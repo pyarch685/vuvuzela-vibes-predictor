@@ -1,6 +1,7 @@
 import { useState, createContext, useContext } from 'react';
 import { Button } from '@/components/ui/button';
 import { Volume2, VolumeX } from 'lucide-react';
+import { useStadiumAmbiance } from '@/hooks/useStadiumAmbiance';
 
 interface SoundContextType {
   soundEnabled: boolean;
@@ -15,9 +16,11 @@ const SoundContext = createContext<SoundContextType>({
 export const useSoundContext = () => useContext(SoundContext);
 
 export const SoundProvider = ({ children }: { children: React.ReactNode }) => {
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(false);
 
   const toggleSound = () => setSoundEnabled(!soundEnabled);
+
+  useStadiumAmbiance(soundEnabled);
 
   return (
     <SoundContext.Provider value={{ soundEnabled, toggleSound }}>
@@ -31,15 +34,15 @@ export const SoundToggle = () => {
 
   return (
     <Button
-      variant="outline"
+      variant="ghost"
       size="icon"
       onClick={toggleSound}
-      className="fixed top-4 right-4 z-50 bg-card/80 backdrop-blur-sm border-secondary/50 hover:bg-secondary/20"
+      className="h-9 w-9"
     >
       {soundEnabled ? (
-        <Volume2 className="h-5 w-5 text-secondary" />
+        <Volume2 className="h-4 w-4 text-secondary" />
       ) : (
-        <VolumeX className="h-5 w-5 text-muted-foreground" />
+        <VolumeX className="h-4 w-4 text-muted-foreground" />
       )}
     </Button>
   );

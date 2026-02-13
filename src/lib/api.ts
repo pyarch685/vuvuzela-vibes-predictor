@@ -1,3 +1,6 @@
+import { z } from 'zod';
+import { devError } from '@/lib/logger';
+
 // FastAPI Backend Configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -40,6 +43,15 @@ export interface UserFeedback {
   user_email?: string;
 }
 
+// Zod schema for validating user feedback before submission
+const UserFeedbackSchema = z.object({
+  fixture_id: z.number().int().positive(),
+  home_team: z.string().min(1).max(100),
+  away_team: z.string().min(1).max(100),
+  user_prediction: z.enum(['home_win', 'draw', 'away_win']),
+  user_email: z.string().email().optional(),
+});
+
 export interface ModelStatus {
   status: string;
   accuracy?: number;
@@ -78,7 +90,8 @@ export const getPrediction = async (homeTeam: string, awayTeam: string): Promise
   });
 
   if (!response.ok) {
-    throw new Error(`Prediction failed: ${response.statusText}`);
+    devError('Prediction request failed:', response.status, response.statusText);
+    throw new Error('Unable to generate prediction. Please try again later.');
   }
 
   const data = await response.json();
@@ -119,12 +132,10 @@ const isHotMatch = (homeTeam: string, awayTeam: string, confidence?: number): bo
     'Richards Bay'
   ];
   
-  // Normalize team names for comparison (case-insensitive, remove extra spaces)
   const normalizeTeam = (team: string) => team.toLowerCase().trim();
   const normalizedHome = normalizeTeam(homeTeam);
   const normalizedAway = normalizeTeam(awayTeam);
   
-  // Check if either team matches any hot team (case-insensitive, partial match)
   const isHotTeam = hotMatchTeams.some(team => {
     const normalizedHotTeam = normalizeTeam(team);
     return normalizedHome.includes(normalizedHotTeam) || 
@@ -172,23 +183,18 @@ export const getFixtures = async (days: number = 14, limit: number = 5): Promise
   });
 
   if (!response.ok) {
-    const errorText = await response.text().catch(() => response.statusText);
-    let errorMessage = `Failed to fetch fixtures: ${response.status}`;
-    try {
-      const errorData = JSON.parse(errorText);
-      errorMessage = errorData.detail || errorMessage;
-    } catch {
-      errorMessage = errorText || errorMessage;
+    const errorText = await response.text().catch(() => '');
+    devError('Fixtures request failed:', response.status, errorText);
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Session expired. Please log in again.');
     }
-    throw new Error(errorMessage);
+    throw new Error('Unable to load fixtures. Please try again later.');
   }
 
   const data = await response.json();
   const fixtures = data.fixtures || [];
   
-  // Transform backend response to frontend format
   return fixtures.map((fixture: any, index: number) => {
-    // Backend now provides date and time separately
     const date = fixture.date || '';
     const time = fixture.time || '15:00';
     const probabilities = fixture.probabilities || {};
@@ -213,16 +219,20 @@ export const getFixtures = async (days: number = 14, limit: number = 5): Promise
 
 // User Feedback API
 export const submitUserFeedback = async (feedback: UserFeedback): Promise<{ success: boolean; message: string }> => {
+  // Validate feedback before sending
+  const validated = UserFeedbackSchema.parse(feedback);
+
   const response = await fetch(`${API_BASE_URL}/feedback`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(feedback),
+    body: JSON.stringify(validated),
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to submit feedback: ${response.statusText}`);
+    devError('Feedback submission failed:', response.status, response.statusText);
+    throw new Error('Unable to submit feedback. Please try again later.');
   }
 
   return response.json();
@@ -238,12 +248,12 @@ export const getModelStatus = async (): Promise<ModelStatus> => {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch model status: ${response.statusText}`);
+    devError('Model status request failed:', response.status, response.statusText);
+    throw new Error('Unable to fetch model status. Please try again later.');
   }
 
   const data = await response.json();
   
-  // Transform backend response to frontend format
   let status: string = 'offline';
   if (data.trained === true) {
     status = 'ready';
@@ -251,13 +261,12 @@ export const getModelStatus = async (): Promise<ModelStatus> => {
     status = 'offline';
   }
   
-  // Extract accuracy from model_params if available (could be calculated from calibration)
-  const accuracy = data.model_params?.calibrated ? 0.75 : undefined; // Placeholder, could be improved
+  const accuracy = data.model_params?.calibrated ? 0.75 : undefined;
   
   return {
     status,
     accuracy,
-    last_trained: data.model_params ? new Date().toISOString() : undefined, // Placeholder
+    last_trained: data.model_params ? new Date().toISOString() : undefined,
     total_predictions: data.teams_count,
   };
 };
@@ -277,14 +286,13 @@ export const getTeams = async (): Promise<Team[]> => {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch teams: ${response.statusText}`);
+    devError('Teams request failed:', response.status, response.statusText);
+    throw new Error('Unable to load teams. Please try again later.');
   }
 
   const data = await response.json();
   const teams = data.teams || [];
   
-  // Transform backend team names to frontend format
-  // Convert team names to value format (lowercase with underscores)
   return teams.map((teamName: string) => ({
     name: teamName,
     value: teamName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''),
@@ -301,7 +309,8 @@ export const getAboutContent = async (): Promise<string> => {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch about content: ${response.statusText}`);
+    devError('About content request failed:', response.status, response.statusText);
+    throw new Error('Unable to load content. Please try again later.');
   }
 
   const data = await response.json();
@@ -317,7 +326,8 @@ export const getDisclaimerContent = async (): Promise<string> => {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch disclaimer content: ${response.statusText}`);
+    devError('Disclaimer content request failed:', response.status, response.statusText);
+    throw new Error('Unable to load content. Please try again later.');
   }
 
   const data = await response.json();
@@ -333,7 +343,8 @@ export const getContactContent = async (): Promise<string> => {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch contact content: ${response.statusText}`);
+    devError('Contact content request failed:', response.status, response.statusText);
+    throw new Error('Unable to load content. Please try again later.');
   }
 
   const data = await response.json();
@@ -342,6 +353,7 @@ export const getContactContent = async (): Promise<string> => {
 
 // Authentication API
 export interface RegisterRequest {
+  username: string;
   email: string;
   password: string;
 }
@@ -353,6 +365,7 @@ export interface RegisterResponse {
 }
 
 export interface LoginRequest {
+  username: string;
   email: string;
   password: string;
 }
@@ -361,44 +374,52 @@ export interface LoginResponse {
   success: boolean;
   message: string;
   user_id?: number;
+  username?: string;
   access_token?: string;
   token_type?: string;
 }
 
-export const registerUser = async (email: string, password: string): Promise<RegisterResponse> => {
+export const registerUser = async (username: string, email: string, password: string): Promise<RegisterResponse> => {
   const response = await fetch(`${API_BASE_URL}/auth/register`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ username, email, password }),
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: response.statusText }));
-    throw new Error(error.detail || `Registration failed: ${response.statusText}`);
+    const error = await response.json().catch(() => ({}));
+    devError('Registration failed:', response.status);
+    if (response.status === 409 || error.detail?.toLowerCase().includes('exists')) {
+      throw new Error('An account with this email already exists.');
+    }
+    throw new Error('Registration failed. Please try again later.');
   }
 
   return response.json();
 };
 
-export const loginUser = async (email: string, password: string): Promise<LoginResponse> => {
+export const loginUser = async (username: string, email: string, password: string): Promise<LoginResponse> => {
   const response = await fetch(`${API_BASE_URL}/auth/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ username, email, password }),
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: response.statusText }));
-    throw new Error(error.detail || `Login failed: ${response.statusText}`);
+    const error = await response.json().catch(() => ({}));
+    devError('Login failed:', response.status);
+    if (response.status === 401) {
+      throw new Error('Invalid email or password.');
+    }
+    throw new Error('Login failed. Please try again later.');
   }
 
   const result = await response.json();
   
-  // Save token to localStorage if login successful
   if (result.access_token) {
     saveAuthToken(result.access_token);
   }
@@ -409,6 +430,68 @@ export const loginUser = async (email: string, password: string): Promise<LoginR
 // Logout function
 export const logoutUser = (): void => {
   removeAuthToken();
+};
+
+// Benchmark API
+export interface BenchmarkMatch {
+  id: number;
+  home_team: string;
+  away_team: string;
+  date: string;
+  predicted_outcome: string;
+  actual_outcome: string | null;
+  actual_score: string | null;
+  correct: boolean | null;
+  confidence: string;
+}
+
+export interface BenchmarkSummary {
+  total_matches: number;
+  correct: number;
+  incorrect: number;
+  pending: number;
+  accuracy: number;
+  accuracy_by_confidence?: { confidence: string; accuracy: number; count: number }[];
+}
+
+export interface BenchmarkResponse {
+  summary: BenchmarkSummary;
+  matches: BenchmarkMatch[];
+}
+
+export const getBenchmarkResults = async (): Promise<BenchmarkResponse> => {
+  const token = getAuthToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const response = await fetch(`${API_BASE_URL}/benchmark`, {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    devError('Benchmark request failed:', response.status, errorText);
+    throw new Error('Unable to load benchmark data. Please try again later.');
+  }
+
+  return response.json();
+};
+
+// Stadium Audio API
+export const getStadiumAudioUrl = async (): Promise<string | null> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/audio/stadium`, {
+      method: 'GET',
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    const url = data.url || null;
+    if (!url) return null;
+    return url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
+  } catch {
+    return null;
+  }
 };
 
 // Health Check
