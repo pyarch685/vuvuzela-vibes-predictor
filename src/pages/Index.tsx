@@ -324,8 +324,8 @@ const Index = () => {
           </Tabs>
         </main>
 
-        <Footer />
         <TwitterSidebar twitterHandle="OfficialPSL" />
+        <Footer />
       </div>
     </SoundProvider>
   );
