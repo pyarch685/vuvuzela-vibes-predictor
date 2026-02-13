@@ -411,6 +411,51 @@ export const logoutUser = (): void => {
   removeAuthToken();
 };
 
+// Benchmark API
+export interface BenchmarkMatch {
+  id: number;
+  home_team: string;
+  away_team: string;
+  date: string;
+  predicted_outcome: string;
+  actual_outcome: string | null;
+  actual_score: string | null;
+  correct: boolean | null;
+  confidence: string;
+}
+
+export interface BenchmarkSummary {
+  total_matches: number;
+  correct: number;
+  incorrect: number;
+  pending: number;
+  accuracy: number;
+  accuracy_by_confidence?: { confidence: string; accuracy: number; count: number }[];
+}
+
+export interface BenchmarkResponse {
+  summary: BenchmarkSummary;
+  matches: BenchmarkMatch[];
+}
+
+export const getBenchmarkResults = async (): Promise<BenchmarkResponse> => {
+  const token = getAuthToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const response = await fetch(`${API_BASE_URL}/benchmark`, {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => response.statusText);
+    throw new Error(`Failed to fetch benchmark: ${errorText}`);
+  }
+
+  return response.json();
+};
+
 // Health Check
 export const checkHealth = async (): Promise<boolean> => {
   try {
