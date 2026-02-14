@@ -452,11 +452,13 @@ export interface BenchmarkSummary {
   pending: number;
   accuracy: number;
   accuracy_by_confidence?: { confidence: string; accuracy: number; count: number }[];
+  accuracy_by_period?: { period: string; accuracy: number; correct: number; total: number }[];
 }
 
 export interface BenchmarkResponse {
   summary: BenchmarkSummary;
   matches: BenchmarkMatch[];
+  message?: string;
 }
 
 export const getBenchmarkResults = async (): Promise<BenchmarkResponse> => {
@@ -473,6 +475,48 @@ export const getBenchmarkResults = async (): Promise<BenchmarkResponse> => {
     const errorText = await response.text().catch(() => '');
     devError('Benchmark request failed:', response.status, errorText);
     throw new Error('Unable to load benchmark data. Please try again later.');
+  }
+
+  return response.json();
+};
+
+export const triggerScrapeRefresh = async (wait = false): Promise<{ message: string }> => {
+  const url = `${API_BASE_URL}/scrape/refresh${wait ? '?wait=true' : ''}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  if (!response.ok) {
+    throw new Error('Unable to trigger scrape refresh.');
+  }
+
+  return response.json();
+};
+
+// Twitter Feed API (Fan Zone)
+export interface TwitterTweet {
+  id: string;
+  text: string;
+  created_at: string;
+  url: string;
+  metrics?: { like_count?: number; retweet_count?: number };
+}
+
+export interface TwitterFeedResponse {
+  tweets: TwitterTweet[];
+  error?: string;
+}
+
+export const getTwitterFeed = async (handle: string = 'OfficialPSL'): Promise<TwitterFeedResponse> => {
+  const username = handle.replace(/^@/, '');
+  const response = await fetch(`${API_BASE_URL}/twitter/feed?handle=${encodeURIComponent(username)}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  if (!response.ok) {
+    return { tweets: [], error: 'Unable to load Twitter feed.' };
   }
 
   return response.json();

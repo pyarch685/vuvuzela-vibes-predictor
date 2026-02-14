@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { StadiumCard } from '@/components/StadiumCard';
 import { NavHeader } from '@/components/NavHeader';
 import { Footer } from '@/components/Footer';
@@ -6,37 +6,58 @@ import { SoundProvider } from '@/components/SoundToggle';
 import { FloatingElements } from '@/components/FloatingElements';
 import { SponsorPlaceholder } from '@/components/SponsorPlaceholder';
 import { SponsorBanner } from '@/components/SponsorBanner';
-import { getBenchmarkResults, BenchmarkSummary, BenchmarkMatch } from '@/lib/api';
-import { Loader2, CheckCircle2, XCircle, MinusCircle, TrendingUp, BarChart3, Target } from 'lucide-react';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { getBenchmarkResults, triggerScrapeRefresh, BenchmarkSummary, BenchmarkMatch } from '@/lib/api';
+import { Loader2, CheckCircle2, XCircle, MinusCircle, TrendingUp, BarChart3, Target, RefreshCw } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { useToast } from '@/hooks/use-toast';
 
 const Benchmark = () => {
   const [summary, setSummary] = useState<BenchmarkSummary | null>(null);
   const [matches, setMatches] = useState<BenchmarkMatch[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getBenchmarkResults();
+      setSummary(data.summary);
+      setMatches(data.matches);
+      if (data.message) setError(data.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load benchmark data');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      toast({ title: 'Refreshing...', description: 'Scraping psl.co.za for latest results.' });
+      await triggerScrapeRefresh(true);
+      await fetchData();
+      toast({ title: 'Data refreshed', description: 'Benchmark results updated.' });
+    } catch (err) {
+      toast({ title: 'Refresh failed', description: err instanceof Error ? err.message : 'Could not trigger scrape', variant: 'destructive' });
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await getBenchmarkResults();
-        setSummary(data.summary);
-        setMatches(data.matches);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load benchmark data');
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   const outcomeIcon = (correct: boolean | null) => {
     if (correct === null) return <MinusCircle className="h-5 w-5 text-muted-foreground" />;
@@ -80,9 +101,20 @@ const Benchmark = () => {
                     psl.co.za
                   </a>
                 </p>
-                <Button variant="ghost" onClick={() => navigate('/')} className="text-muted-foreground hover:text-foreground">
-                  ← Back to Predictor
-                </Button>
+                <div className="flex justify-center gap-2">
+                  <Button variant="ghost" onClick={() => navigate('/')} className="text-muted-foreground hover:text-foreground">
+                    ← Back to Predictor
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleRefresh}
+                    disabled={refreshing}
+                    className="gap-2 border-secondary/50 hover:bg-secondary/10"
+                  >
+                    {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    Refresh data
+                  </Button>
+                </div>
               </div>
 
               {loading ? (
@@ -156,6 +188,53 @@ const Benchmark = () => {
                         </div>
                       </StadiumCard>
                     </div>
+                  )}
+
+                  {/* Performance Over Time */}
+                  {summary?.accuracy_by_period && summary.accuracy_by_period.length > 0 && (
+                    <StadiumCard title="Performance Over Time">
+                      <ChartContainer
+                        config={{
+                          accuracy: {
+                            label: 'Accuracy',
+                            color: 'hsl(var(--primary))',
+                          },
+                        }}
+                        className="h-[280px] w-full"
+                      >
+                        <LineChart
+                          data={summary.accuracy_by_period.map((p) => ({
+                            period: p.period,
+                            accuracy: Math.round(p.accuracy * 1000) / 10,
+                          }))}
+                          margin={{ top: 5, right: 10, left: 10, bottom: 0 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                          <XAxis
+                            dataKey="period"
+                            tickLine={false}
+                            axisLine={false}
+                            tickMargin={8}
+                          />
+                          <YAxis
+                            tickLine={false}
+                            axisLine={false}
+                            tickMargin={8}
+                            domain={[0, 100]}
+                            tickFormatter={(v) => `${v}%`}
+                          />
+                          <ChartTooltip content={<ChartTooltipContent formatter={(v: number) => [`${v}%`, 'Accuracy']} />} />
+                          <Line
+                            type="monotone"
+                            dataKey="accuracy"
+                            stroke="var(--color-accuracy)"
+                            strokeWidth={2}
+                            dot={{ fill: 'var(--color-accuracy)', r: 4 }}
+                            connectNulls
+                          />
+                        </LineChart>
+                      </ChartContainer>
+                    </StadiumCard>
                   )}
 
                   {/* Match-by-Match Table */}
