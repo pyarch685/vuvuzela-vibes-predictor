@@ -7,6 +7,10 @@ interface TwitterSidebarProps {
   twitterHandle?: string;
 }
 
+type FeedMode = 'loading' | 'tweets' | 'embed' | 'fallback';
+
+const EMBED_TIMEOUT_MS = 8000;
+
 function formatTweetDate(iso: string): string {
   try {
     const d = new Date(iso);
@@ -27,56 +31,77 @@ function formatTweetDate(iso: string): string {
 export const TwitterSidebar = ({ twitterHandle = 'OfficialPSL' }: TwitterSidebarProps) => {
   const [isOpen, setIsOpen] = useState(true);
   const [tweets, setTweets] = useState<TwitterTweet[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [useEmbed, setUseEmbed] = useState(false);
+  const [mode, setMode] = useState<FeedMode>('loading');
   const embedRef = useRef<HTMLDivElement>(null);
   const scriptLoaded = useRef(false);
+
+  const profileUrl = `https://x.com/${twitterHandle}`;
+  const tweetIntentUrl = `https://x.com/intent/tweet?hashtags=PSL,SouthAfricanFootball`;
 
   useEffect(() => {
     if (!isOpen) return;
 
+    let cancelled = false;
+
     const load = async () => {
-      setLoading(true);
+      setMode('loading');
       try {
         const res = await getTwitterFeed(twitterHandle);
+        if (cancelled) return;
         if (res.tweets?.length) {
           setTweets(res.tweets);
-          setUseEmbed(false);
+          setMode('tweets');
         } else {
-          setUseEmbed(true);
+          setMode('embed');
         }
       } catch {
-        setUseEmbed(true);
-      } finally {
-        setLoading(false);
+        if (!cancelled) setMode('embed');
       }
     };
 
     load();
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen, twitterHandle]);
 
   useEffect(() => {
-    if (!isOpen || !useEmbed) return;
+    if (!isOpen || mode !== 'embed') return;
+
+    let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
 
     const loadTwitterWidget = () => {
-      if ((window as any).twttr?.widgets) {
-        (window as any).twttr.widgets.load(embedRef.current);
-        return;
+      const container = embedRef.current;
+      if (!container) return;
+
+      const twttr = (window as unknown as {
+        twttr?: { widgets?: { load: (el?: HTMLElement | null) => void } };
+      }).twttr;
+
+      if (twttr?.widgets) {
+        twttr.widgets.load(container);
+      } else if (!scriptLoaded.current) {
+        scriptLoaded.current = true;
+        const script = document.createElement('script');
+        script.src = 'https://platform.twitter.com/widgets.js';
+        script.async = true;
+        script.charset = 'utf-8';
+        document.head.appendChild(script);
       }
 
-      if (scriptLoaded.current) return;
-      scriptLoaded.current = true;
-
-      const script = document.createElement('script');
-      script.src = 'https://platform.twitter.com/widgets.js';
-      script.async = true;
-      script.charset = 'utf-8';
-      document.head.appendChild(script);
+      fallbackTimer = setTimeout(() => {
+        if (!embedRef.current) return;
+        const hasIframe = embedRef.current.querySelector('iframe');
+        if (!hasIframe) setMode('fallback');
+      }, EMBED_TIMEOUT_MS);
     };
 
-    const timer = setTimeout(loadTwitterWidget, 300);
-    return () => clearTimeout(timer);
-  }, [isOpen, useEmbed, twitterHandle]);
+    const startTimer = setTimeout(loadTwitterWidget, 100);
+    return () => {
+      clearTimeout(startTimer);
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+    };
+  }, [isOpen, mode, twitterHandle]);
 
   return (
     <section className="w-full max-w-4xl mx-auto py-8 relative z-10">
@@ -101,21 +126,45 @@ export const TwitterSidebar = ({ twitterHandle = 'OfficialPSL' }: TwitterSidebar
       {isOpen && (
         <div className="bg-card/60 backdrop-blur-sm border-2 border-t-0 border-secondary/30 rounded-b-xl overflow-hidden">
           <div className="p-4 max-h-[500px] overflow-y-auto" ref={embedRef}>
-            {loading ? (
+            {mode === 'loading' && (
               <div className="flex justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-secondary" />
               </div>
-            ) : useEmbed ? (
+            )}
+
+            {mode === 'embed' && (
               <a
                 className="twitter-timeline"
                 data-theme="dark"
-                data-chrome="noheader nofooter noborders transparent"
+                data-chrome="noborders transparent"
                 data-height="450"
-                href={`https://twitter.com/${twitterHandle}`}
+                href={profileUrl}
               >
-                Loading tweets...
+                Loading tweets from @{twitterHandle}…
               </a>
-            ) : (
+            )}
+
+            {mode === 'fallback' && (
+              <div className="text-center py-10 space-y-4">
+                <Twitter className="h-10 w-10 text-secondary mx-auto" />
+                <div className="space-y-1">
+                  <p className="text-foreground font-medium">
+                    The live feed couldn't load in the browser.
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    View the latest posts from @{twitterHandle} directly on X.
+                  </p>
+                </div>
+                <a href={profileUrl} target="_blank" rel="noopener noreferrer">
+                  <Button className="gap-2">
+                    <ExternalLink className="h-4 w-4" />
+                    Open @{twitterHandle} on X
+                  </Button>
+                </a>
+              </div>
+            )}
+
+            {mode === 'tweets' && (
               <ul className="space-y-4">
                 {tweets.map((t) => (
                   <li key={t.id} className="border-b border-border/40 pb-4 last:border-0 last:pb-0">
@@ -146,7 +195,7 @@ export const TwitterSidebar = ({ twitterHandle = 'OfficialPSL' }: TwitterSidebar
           {/* Action buttons */}
           <div className="p-4 border-t border-border/40 flex flex-wrap gap-2 items-center justify-between">
             <a
-              href={`https://twitter.com/${twitterHandle}`}
+              href={profileUrl}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -160,7 +209,7 @@ export const TwitterSidebar = ({ twitterHandle = 'OfficialPSL' }: TwitterSidebar
               </Button>
             </a>
             <a
-              href={`https://twitter.com/intent/tweet?hashtags=PSL,SouthAfricanFootball`}
+              href={tweetIntentUrl}
               target="_blank"
               rel="noopener noreferrer"
             >

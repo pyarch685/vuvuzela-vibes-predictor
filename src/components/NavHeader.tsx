@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,6 +34,32 @@ export const NavHeader = () => {
     setPassword('');
   };
 
+  useEffect(() => {
+    const handleOpenLogin = () => {
+      setIsRegisterOpen(false);
+      setIsLoginOpen(true);
+    };
+
+    const handleOpenRegister = () => {
+      setIsLoginOpen(false);
+      setIsRegisterOpen(true);
+    };
+
+    const handleAuthChanged = () => {
+      setLoggedIn(isAuthenticated());
+    };
+
+    window.addEventListener('open-login', handleOpenLogin);
+    window.addEventListener('open-register', handleOpenRegister);
+    window.addEventListener('auth-changed', handleAuthChanged);
+
+    return () => {
+      window.removeEventListener('open-login', handleOpenLogin);
+      window.removeEventListener('open-register', handleOpenRegister);
+      window.removeEventListener('auth-changed', handleAuthChanged);
+    };
+  }, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
@@ -42,6 +68,7 @@ export const NavHeader = () => {
     try {
       const result = await loginUser(username, email, password);
       setLoggedIn(true);
+      window.dispatchEvent(new Event('auth-changed'));
       toast({
         title: 'Welcome back!',
         description: result.message,
@@ -130,6 +157,7 @@ export const NavHeader = () => {
               onClick={() => {
                 logoutUser();
                 setLoggedIn(false);
+                window.dispatchEvent(new Event('auth-changed'));
                 toast({
                   title: 'Logged out',
                   description: 'You have been successfully logged out.',

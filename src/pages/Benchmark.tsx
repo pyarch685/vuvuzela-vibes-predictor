@@ -6,8 +6,9 @@ import { SoundProvider } from '@/components/SoundToggle';
 import { FloatingElements } from '@/components/FloatingElements';
 import { SponsorPlaceholder } from '@/components/SponsorPlaceholder';
 import { SponsorBanner } from '@/components/SponsorBanner';
+import { LoginPrompt } from '@/components/LoginPrompt';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { getBenchmarkResults, triggerScrapeRefresh, BenchmarkSummary, BenchmarkMatch } from '@/lib/api';
+import { getBenchmarkResults, triggerScrapeRefresh, BenchmarkSummary, BenchmarkMatch, isAuthenticated } from '@/lib/api';
 import { Loader2, CheckCircle2, XCircle, MinusCircle, TrendingUp, BarChart3, Target, RefreshCw } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
@@ -20,6 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 const Benchmark = () => {
   const [summary, setSummary] = useState<BenchmarkSummary | null>(null);
   const [matches, setMatches] = useState<BenchmarkMatch[]>([]);
+  const [authenticated, setAuthenticated] = useState(isAuthenticated());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,13 +31,29 @@ const Benchmark = () => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
+    if (!isAuthenticated()) {
+      setAuthenticated(false);
+      setSummary(null);
+      setMatches([]);
+      setLoading(false);
+      return;
+    }
     try {
       const data = await getBenchmarkResults();
+      setAuthenticated(true);
       setSummary(data.summary);
       setMatches(data.matches);
       if (data.message) setError(data.message);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load benchmark data');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load benchmark data';
+      if (errorMessage.includes('Session expired') || errorMessage.includes('Authentication required')) {
+        setAuthenticated(false);
+        setSummary(null);
+        setMatches([]);
+        setError(null);
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -58,6 +76,26 @@ const Benchmark = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    const syncAuthState = () => {
+      setAuthenticated(isAuthenticated());
+    };
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'auth_token') {
+        syncAuthState();
+      }
+    };
+
+    window.addEventListener('auth-changed', syncAuthState);
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('auth-changed', syncAuthState);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
   const outcomeIcon = (correct: boolean | null) => {
     if (correct === null) return <MinusCircle className="h-5 w-5 text-muted-foreground" />;
@@ -117,7 +155,9 @@ const Benchmark = () => {
                 </div>
               </div>
 
-              {loading ? (
+              {!authenticated ? (
+                <LoginPrompt title="Benchmark Locked" />
+              ) : loading ? (
                 <div className="flex justify-center py-16">
                   <Loader2 className="h-12 w-12 animate-spin text-secondary" />
                 </div>
