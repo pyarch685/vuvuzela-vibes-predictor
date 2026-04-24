@@ -26,23 +26,14 @@ jobs:
           VITE_API_URL: https://api.pslpredictor.com
         run: npm run build
 
-      - name: Inspect secret (non-leaky)
+      - name: Discover correct account ID
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          echo "token length: ${#CLOUDFLARE_API_TOKEN}"
-          echo "token prefix (first 4): ${CLOUDFLARE_API_TOKEN:0:4}"
-          echo "token ends-with-whitespace? [$(echo -n "${CLOUDFLARE_API_TOKEN: -1}" | xxd -p)]"
-          echo "token sha256: $(echo -n "$CLOUDFLARE_API_TOKEN" | sha256sum | cut -c1-16)"
-          echo "account length: ${#CLOUDFLARE_ACCOUNT_ID}"
-          echo "account sha256: $(echo -n "$CLOUDFLARE_ACCOUNT_ID" | sha256sum | cut -c1-16)"
-          echo "--- direct API probe (bypasses wrangler) ---"
-          curl -sS "https://api.cloudflare.com/client/v4/user/tokens/verify" \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" | head -c 500
-          echo ""
-          curl -sS "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects" \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" | head -c 500
+          echo "--- accounts the token has access to ---"
+          curl -sS "https://api.cloudflare.com/client/v4/accounts" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            | python3 -c "import json,sys;d=json.load(sys.stdin);print(json.dumps([{'id':a['id'],'name':a['name']} for a in d.get('result',[])],indent=2));print('success:',d.get('success'));print('errors:',d.get('errors'))"
 
       - name: Deploy to Cloudflare Pages
         env:
