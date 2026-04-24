@@ -26,15 +26,6 @@ jobs:
           VITE_API_URL: https://api.pslpredictor.com
         run: npm run build
 
-      - name: Discover correct account ID
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: |
-          echo "--- accounts the token has access to ---"
-          curl -sS "https://api.cloudflare.com/client/v4/accounts" \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            | python3 -c "import json,sys;d=json.load(sys.stdin);print(json.dumps([{'id':a['id'],'name':a['name']} for a in d.get('result',[])],indent=2));print('success:',d.get('success'));print('errors:',d.get('errors'))"
-
       - name: Deploy to Cloudflare Pages
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
