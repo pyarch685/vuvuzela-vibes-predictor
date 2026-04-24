@@ -10,13 +10,14 @@ import { VuvuzelaButton } from '@/components/VuvuzelaButton';
 import { PredictionResult } from '@/components/PredictionResult';
 import { FixtureCard } from '@/components/FixtureCard';
 import { Footer } from '@/components/Footer';
-import { SoundToggle, SoundProvider } from '@/components/SoundToggle';
+import { SoundProvider } from '@/components/SoundToggle';
 import { NavHeader } from '@/components/NavHeader';
 import { TwitterSidebar } from '@/components/TwitterSidebar';
 import { SponsorPlaceholder } from '@/components/SponsorPlaceholder';
 import { SponsorBanner } from '@/components/SponsorBanner';
+import { LoginPrompt } from '@/components/LoginPrompt';
 import { useToast } from '@/hooks/use-toast';
-import { getPrediction, getFixtures, getModelStatus, getTeams, Fixture, ModelStatus, Team, isAuthenticated } from '@/lib/api';
+import { getPrediction, getFixtures, getModelStatus, getTeams, Fixture, ModelStatus, Team, isAuthenticated, API_HOST_LABEL } from '@/lib/api';
 import { Loader2 } from 'lucide-react';
 
 const Index = () => {
@@ -30,6 +31,7 @@ const Index = () => {
   const [statusLoading, setStatusLoading] = useState(false);
   const [teams, setTeams] = useState<Team[]>([]);
   const [teamsLoading, setTeamsLoading] = useState(true);
+  const [authenticated, setAuthenticated] = useState(isAuthenticated());
   const { toast } = useToast();
 
   // Fetch teams on mount
@@ -64,11 +66,31 @@ const Index = () => {
   
   // Fetch fixtures on mount and when authentication changes
   useEffect(() => {
+    const syncAuthState = () => {
+      setAuthenticated(isAuthenticated());
+    };
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'auth_token') {
+        syncAuthState();
+      }
+    };
+
+    window.addEventListener('auth-changed', syncAuthState);
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('auth-changed', syncAuthState);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
+
+  useEffect(() => {
     let mounted = true;
     
     const fetchFixtures = async () => {
       // Only fetch fixtures if user is authenticated
-      if (!isAuthenticated()) {
+      if (!authenticated) {
         if (mounted) {
           setFixtures([]);
           setFixturesLoading(false);
@@ -77,8 +99,8 @@ const Index = () => {
         return;
       }
 
-      // Don't fetch if we already have fixtures or are currently loading
-      if (hasFetchedRef.current && fixtures.length > 0) {
+      // Don't fetch if we already fetched successfully in this auth session
+      if (hasFetchedRef.current) {
         return;
       }
 
@@ -116,40 +138,40 @@ const Index = () => {
     // Initial fetch
     fetchFixtures();
     
-    // Listen for storage changes (when token is added/removed in other tabs)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'auth_token') {
-        hasFetchedRef.current = false; // Reset to allow fetch
+    const handleAuthChanged = () => {
+      if (mounted) {
+        hasFetchedRef.current = false;
         fetchFixtures();
       }
     };
-    
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Also check periodically (every 5 seconds) for same-tab auth changes
-    // This handles the case where login happens in the same tab
-    const interval = setInterval(() => {
-      if (isAuthenticated() && !hasFetchedRef.current) {
-        // Only fetch if we haven't fetched yet
-        fetchFixtures();
-      }
-    }, 5000);
+
+    window.addEventListener('auth-changed', handleAuthChanged);
     
     return () => {
       mounted = false;
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
+      window.removeEventListener('auth-changed', handleAuthChanged);
     };
-  }, []); // Empty dependency array - only run on mount
+  }, [authenticated]);
 
   // Fetch model status
   const fetchModelStatus = async () => {
+    if (!authenticated) {
+      setModelStatus(null);
+      return;
+    }
+
     setStatusLoading(true);
     try {
       const data = await getModelStatus();
       setModelStatus(data);
     } catch (error) {
-      setModelStatus({ status: 'offline', accuracy: undefined, last_trained: undefined });
+      const errorMessage = error instanceof Error ? error.message : '';
+      if (errorMessage.includes('Session expired') || errorMessage.includes('Authentication required')) {
+        setAuthenticated(false);
+        setModelStatus(null);
+      } else {
+        setModelStatus({ status: 'offline', accuracy: undefined, last_trained: undefined });
+      }
     } finally {
       setStatusLoading(false);
     }
@@ -182,10 +204,10 @@ const Index = () => {
         confidence: result.confidence,
       });
     } catch (error) {
-      toast({ 
-        title: 'Connection Error', 
-        description: 'Could not connect to backend. Make sure FastAPI is running on localhost:8000', 
-        variant: 'destructive' 
+      toast({
+        title: 'Connection Error',
+        description: 'Could not connect to the prediction service. Please try again shortly.',
+        variant: 'destructive'
       });
       // Fallback mock prediction
       const homeWin = Math.random() * 0.5 + 0.2;
@@ -261,71 +283,79 @@ const Index = () => {
                 </TabsContent>
 
                 <TabsContent value="fixtures">
-                  <StadiumCard title="Upcoming Fixtures">
-                    {fixturesLoading ? (
-                      <div className="flex justify-center py-8">
-                        <Loader2 className="h-8 w-8 animate-spin text-secondary" />
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {fixtures.map((fixture) => (
-                          <FixtureCard 
-                            key={fixture.id} 
-                            id={fixture.id}
-                            homeTeam={fixture.home_team} 
-                            awayTeam={fixture.away_team}
-                            date={fixture.date}
-                            time={fixture.time}
-                            venue={fixture.venue}
-                            isHotMatch={fixture.is_hot_match}
-                            prediction={fixture.prediction ? {
-                              homeWin: fixture.prediction.home_win,
-                              draw: fixture.prediction.draw,
-                              awayWin: fixture.prediction.away_win,
-                              predicted: fixture.prediction.predicted,
-                            } : undefined}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </StadiumCard>
+                  {!authenticated ? (
+                    <LoginPrompt title="Fixtures Locked" />
+                  ) : (
+                    <StadiumCard title="Upcoming Fixtures">
+                      {fixturesLoading ? (
+                        <div className="flex justify-center py-8">
+                          <Loader2 className="h-8 w-8 animate-spin text-secondary" />
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {fixtures.map((fixture) => (
+                            <FixtureCard 
+                              key={fixture.id} 
+                              id={fixture.id}
+                              homeTeam={fixture.home_team} 
+                              awayTeam={fixture.away_team}
+                              date={fixture.date}
+                              time={fixture.time}
+                              venue={fixture.venue}
+                              isHotMatch={fixture.is_hot_match}
+                              prediction={fixture.prediction ? {
+                                homeWin: fixture.prediction.home_win,
+                                draw: fixture.prediction.draw,
+                                awayWin: fixture.prediction.away_win,
+                                predicted: fixture.prediction.predicted,
+                              } : undefined}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </StadiumCard>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="status">
-                  <StadiumCard title="Model Status">
-                    {statusLoading ? (
-                      <div className="flex justify-center py-8">
-                        <Loader2 className="h-8 w-8 animate-spin text-secondary" />
-                      </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <div className="text-6xl mb-4">
-                          {modelStatus?.status === 'ready' ? '✅' : modelStatus?.status === 'offline' ? '❌' : '🤖'}
+                  {!authenticated ? (
+                    <LoginPrompt title="Model Status Locked" />
+                  ) : (
+                    <StadiumCard title="Model Status">
+                      {statusLoading ? (
+                        <div className="flex justify-center py-8">
+                          <Loader2 className="h-8 w-8 animate-spin text-secondary" />
                         </div>
-                        <p className="text-xl text-secondary font-display capitalize">
-                          {modelStatus?.status || 'Click to check status'}
-                        </p>
-                        {modelStatus?.accuracy && (
-                          <p className="text-muted-foreground mt-2">
-                            Accuracy: {(modelStatus.accuracy * 100).toFixed(1)}%
+                      ) : (
+                        <div className="text-center py-8">
+                          <div className="text-6xl mb-4">
+                            {modelStatus?.status === 'ready' ? '✅' : modelStatus?.status === 'offline' ? '❌' : '🤖'}
+                          </div>
+                          <p className="text-xl text-secondary font-display capitalize">
+                            {modelStatus?.status || 'Click to check status'}
                           </p>
-                        )}
-                        {modelStatus?.last_trained && (
-                          <p className="text-muted-foreground mt-1">
-                            Last trained: {modelStatus.last_trained}
+                          {modelStatus?.accuracy && (
+                            <p className="text-muted-foreground mt-2">
+                              Accuracy: {(modelStatus.accuracy * 100).toFixed(1)}%
+                            </p>
+                          )}
+                          {modelStatus?.last_trained && (
+                            <p className="text-muted-foreground mt-1">
+                              Last trained: {modelStatus.last_trained}
+                            </p>
+                          )}
+                          {modelStatus?.total_predictions && (
+                            <p className="text-muted-foreground mt-1">
+                              Total predictions: {modelStatus.total_predictions.toLocaleString()}
+                            </p>
+                          )}
+                          <p className="text-sm text-muted-foreground/70 mt-4">
+                            Backend: {API_HOST_LABEL}
                           </p>
-                        )}
-                        {modelStatus?.total_predictions && (
-                          <p className="text-muted-foreground mt-1">
-                            Total predictions: {modelStatus.total_predictions.toLocaleString()}
-                          </p>
-                        )}
-                        <p className="text-sm text-muted-foreground/70 mt-4">
-                          Backend: localhost:8000
-                        </p>
-                      </div>
-                    )}
-                  </StadiumCard>
+                        </div>
+                      )}
+                    </StadiumCard>
+                  )}
                 </TabsContent>
               </Tabs>
 

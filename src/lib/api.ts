@@ -2,7 +2,16 @@ import { z } from 'zod';
 import { devError } from '@/lib/logger';
 
 // FastAPI Backend Configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+// Human-friendly API host label (used in status panels).
+export const API_HOST_LABEL = (() => {
+  try {
+    return new URL(API_BASE_URL).host;
+  } catch {
+    return API_BASE_URL;
+  }
+})();
 
 export interface PredictionRequest {
   home_team: string;
@@ -153,6 +162,18 @@ const getAuthToken = (): string | null => {
   return localStorage.getItem('auth_token');
 };
 
+const authHeaders = (): Record<string, string> => {
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error('Authentication required. Please log in.');
+  }
+
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`,
+  };
+};
+
 // Helper function to save auth token to localStorage
 export const saveAuthToken = (token: string): void => {
   localStorage.setItem('auth_token', token);
@@ -242,13 +263,15 @@ export const submitUserFeedback = async (feedback: UserFeedback): Promise<{ succ
 export const getModelStatus = async (): Promise<ModelStatus> => {
   const response = await fetch(`${API_BASE_URL}/model/status`, {
     method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: authHeaders(),
   });
 
   if (!response.ok) {
-    devError('Model status request failed:', response.status, response.statusText);
+    const errorText = await response.text().catch(() => '');
+    devError('Model status request failed:', response.status, errorText);
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Session expired. Please log in again.');
+    }
     throw new Error('Unable to fetch model status. Please try again later.');
   }
 
@@ -462,18 +485,17 @@ export interface BenchmarkResponse {
 }
 
 export const getBenchmarkResults = async (): Promise<BenchmarkResponse> => {
-  const token = getAuthToken();
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
   const response = await fetch(`${API_BASE_URL}/benchmark`, {
     method: 'GET',
-    headers,
+    headers: authHeaders(),
   });
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => '');
     devError('Benchmark request failed:', response.status, errorText);
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Session expired. Please log in again.');
+    }
     throw new Error('Unable to load benchmark data. Please try again later.');
   }
 
@@ -484,10 +506,13 @@ export const triggerScrapeRefresh = async (wait = false): Promise<{ message: str
   const url = `${API_BASE_URL}/scrape/refresh${wait ? '?wait=true' : ''}`;
   const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
   });
 
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Session expired. Please log in again.');
+    }
     throw new Error('Unable to trigger scrape refresh.');
   }
 
