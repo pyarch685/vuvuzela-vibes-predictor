@@ -4,7 +4,8 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@wc/*": ["./src/wc2026/*"]
     },
     "noImplicitAny": false,
     "noUnusedParameters": false,
