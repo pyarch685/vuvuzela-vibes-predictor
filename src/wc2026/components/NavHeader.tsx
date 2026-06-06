@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { User, LogIn, Loader2, BarChart3, Trophy } from 'lucide-react';
-import { SoundToggle } from '@/components/SoundToggle';
+import { User, LogIn, LogOut, Loader2, BarChart3 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -11,13 +10,41 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { registerUser, loginUser, logoutUser, isAuthenticated } from '@/lib/api';
+import { registerUser, loginUser, logoutUser, isAuthenticated } from '@wc/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
+const REMEMBER_KEY = 'wc2026_remembered_creds';
+
+type RememberedCreds = {
+  username?: string;
+  email?: string;
+  password?: string;
+  remember?: boolean;
+};
+
+const loadRemembered = (): RememberedCreds => {
+  try {
+    const raw = localStorage.getItem(REMEMBER_KEY);
+    return raw ? (JSON.parse(raw) as RememberedCreds) : {};
+  } catch {
+    return {};
+  }
+};
+
+const saveRemembered = (creds: RememberedCreds) => {
+  try {
+    localStorage.setItem(REMEMBER_KEY, JSON.stringify(creds));
+  } catch {
+    /* ignore quota / privacy errors */
+  }
+};
+
 export const NavHeader = () => {
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const remembered = loadRemembered();
+  const [username, setUsername] = useState(remembered.username ?? '');
+  const [email, setEmail] = useState(remembered.email ?? '');
+  const [password, setPassword] = useState(remembered.password ?? '');
+  const [rememberMe, setRememberMe] = useState(remembered.remember ?? true);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -29,10 +56,14 @@ export const NavHeader = () => {
   const location = useLocation();
 
   const resetForm = () => {
-    setUsername('');
-    setEmail('');
-    setPassword('');
+    // Reload remembered creds so the form stays prefilled for next time
+    const r = loadRemembered();
+    setUsername(r.username ?? '');
+    setEmail(r.email ?? '');
+    setPassword(r.password ?? '');
+    setRememberMe(r.remember ?? true);
   };
+
 
   useEffect(() => {
     const handleOpenLogin = () => {
@@ -60,6 +91,21 @@ export const NavHeader = () => {
     };
   }, []);
 
+  // After password reset: auto-open login dialog and prefill email
+  useEffect(() => {
+    const shouldOpen = sessionStorage.getItem('wc2026_open_login');
+    if (shouldOpen === 'true') {
+      const prefillEmail = sessionStorage.getItem('wc2026_prefill_email');
+      sessionStorage.removeItem('wc2026_open_login');
+      sessionStorage.removeItem('wc2026_prefill_email');
+      if (prefillEmail) {
+        setEmail(prefillEmail);
+      }
+      setIsRegisterOpen(false);
+      setIsLoginOpen(true);
+    }
+  }, [location.pathname]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
@@ -67,6 +113,12 @@ export const NavHeader = () => {
     
     try {
       const result = await loginUser(username, email, password);
+      saveRemembered({
+        username,
+        email,
+        password: rememberMe ? password : undefined,
+        remember: rememberMe,
+      });
       setLoggedIn(true);
       window.dispatchEvent(new Event('auth-changed'));
       toast({
@@ -95,13 +147,19 @@ export const NavHeader = () => {
     
     try {
       const result = await registerUser(username, email, password);
+      // Persist credentials so the upcoming login dialog is prefilled
+      saveRemembered({
+        username,
+        email,
+        password: rememberMe ? password : undefined,
+        remember: rememberMe,
+      });
       toast({
         title: 'Account created!',
         description: result.message,
       });
       setIsRegisterOpen(false);
-      resetForm();
-      // Switch to login dialog
+      // Switch to login dialog with creds already filled in
       setIsLoginOpen(true);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Registration failed';
@@ -116,48 +174,56 @@ export const NavHeader = () => {
     }
   };
 
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-md">
       <div className="container mx-auto flex h-14 items-center justify-between px-4">
         {/* Logo */}
         <div className="flex items-center gap-2">
           <span className="text-2xl">⚽</span>
-          <span className="font-display text-xl font-bold text-primary">PSL Predictor</span>
+          <span className="font-display text-xl font-bold text-foreground">WC 2026 <span className="text-accent">Predictor</span></span>
         </div>
 
-        {/* Nav Links */}
+        {/* Nav Links — WC2026 routes are nested under /wc2026 in the tabbed app */}
         <div className="flex items-center gap-1">
           <Button
-            variant={location.pathname === '/' ? 'secondary' : 'ghost'}
+            variant={location.pathname === '/wc2026' ? 'secondary' : 'ghost'}
             size="sm"
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/wc2026')}
             className="gap-1"
           >
             ⚽ <span className="hidden sm:inline">Predictor</span>
           </Button>
           <Button
-            variant={location.pathname === '/benchmark' ? 'secondary' : 'ghost'}
+            variant={location.pathname === '/wc2026/groups' ? 'secondary' : 'ghost'}
             size="sm"
-            onClick={() => navigate('/benchmark')}
+            onClick={() => navigate('/wc2026/groups')}
+            className="gap-1"
+          >
+            🏆 <span className="hidden sm:inline">Groups</span>
+          </Button>
+          <Button
+            variant={location.pathname === '/wc2026/benchmark' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => navigate('/wc2026/benchmark')}
             className="gap-1"
           >
             <BarChart3 className="h-4 w-4" />
             <span className="hidden sm:inline">Benchmark</span>
           </Button>
           <Button
-            variant={location.pathname.startsWith('/wc2026') ? 'secondary' : 'ghost'}
+            variant="ghost"
             size="sm"
-            onClick={() => navigate('/wc2026')}
+            onClick={() => navigate('/')}
             className="gap-1"
           >
-            <Trophy className="h-4 w-4" />
-            <span className="hidden sm:inline">World Cup 2026</span>
+            <span className="hidden sm:inline">← PSL</span>
+            <span className="sm:hidden">PSL</span>
           </Button>
         </div>
 
         {/* Auth Buttons */}
         <div className="flex items-center gap-1">
-          <SoundToggle />
           {loggedIn ? (
             <Button 
               variant="ghost" 
@@ -165,6 +231,11 @@ export const NavHeader = () => {
               className="gap-2"
               onClick={() => {
                 logoutUser();
+                // Keep username/email prefilled, but always drop stored password on logout
+                const r = loadRemembered();
+                saveRemembered({ username: r.username, email: r.email, remember: false });
+                setPassword('');
+                setRememberMe(false);
                 setLoggedIn(false);
                 window.dispatchEvent(new Event('auth-changed'));
                 toast({
@@ -173,7 +244,7 @@ export const NavHeader = () => {
                 });
               }}
             >
-              <LogIn className="h-4 w-4" />
+              <LogOut className="h-4 w-4" />
               <span className="hidden sm:inline">Logout</span>
             </Button>
           ) : (
@@ -190,7 +261,7 @@ export const NavHeader = () => {
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 font-display">
                   <LogIn className="h-5 w-5 text-primary" />
-                  Login to PSL Predictor
+                  Login to WC 2026 Predictor
                 </DialogTitle>
               </DialogHeader>
               <form onSubmit={handleLogin} className="space-y-4 mt-4">
@@ -236,6 +307,15 @@ export const NavHeader = () => {
                 {loginError && (
                   <p className="text-sm text-destructive">{loginError}</p>
                 )}
+                <label className="flex items-center gap-2 text-sm text-muted-foreground select-none cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-primary"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                  />
+                  Remember me on this device
+                </label>
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? (
                     <>
@@ -246,19 +326,31 @@ export const NavHeader = () => {
                     'Login'
                   )}
                 </Button>
-                <p className="text-center text-sm text-muted-foreground">
-                  Don't have an account?{' '}
+                <div className="space-y-2 text-center text-sm">
                   <button
                     type="button"
                     className="text-primary hover:underline"
                     onClick={() => {
                       setIsLoginOpen(false);
-                      setIsRegisterOpen(true);
+                      navigate('/forgot-password');
                     }}
                   >
-                    Register
+                    Forgot password?
                   </button>
-                </p>
+                  <p className="text-muted-foreground">
+                    Don't have an account?{' '}
+                    <button
+                      type="button"
+                      className="text-primary hover:underline"
+                      onClick={() => {
+                        setIsLoginOpen(false);
+                        setIsRegisterOpen(true);
+                      }}
+                    >
+                      Register
+                    </button>
+                  </p>
+                </div>
               </form>
             </DialogContent>
           </Dialog>
