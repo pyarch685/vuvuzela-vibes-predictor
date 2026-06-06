@@ -16,7 +16,7 @@ import { SponsorPlaceholder } from '@wc/components/SponsorPlaceholder';
 import { SponsorBanner } from '@wc/components/SponsorBanner';
 import { LoginPrompt } from '@wc/components/LoginPrompt';
 import { useToast } from '@/hooks/use-toast';
-import { getPrediction, getFixtures, getModelStatus, getTeams, Fixture, ModelStatus, Team, isAuthenticated, API_HOST_LABEL } from '@wc/lib/api';
+import { getWc2026Prediction, getFixtures, getModelStatus, getTeams, Fixture, ModelStatus, Team, isAuthenticated, API_HOST_LABEL } from '@wc/lib/api';
 import { Loader2 } from 'lucide-react';
 
 const Index = () => {
@@ -231,8 +231,11 @@ const Index = () => {
       // Get team names from teams list
       const homeTeamName = teams.find(t => t.value === homeTeam)?.name || homeTeam;
       const awayTeamName = teams.find(t => t.value === awayTeam)?.name || awayTeam;
-      
-      const result = await getPrediction(homeTeamName, awayTeamName);
+
+      // Route through the WC2026 FIFA-Elo endpoint, not the PSL /predict
+      // model — the PSL classifier returns near-uniform probabilities for
+      // national teams it has never seen during training.
+      const result = await getWc2026Prediction(homeTeamName, awayTeamName);
       setPrediction({
         homeTeam: result.home_team,
         awayTeam: result.away_team,
@@ -243,10 +246,11 @@ const Index = () => {
         confidence: result.confidence,
       });
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not connect to the prediction service.';
       toast({
-        title: 'Connection Error',
-        description: 'Could not connect to the prediction service. Please try again shortly.',
-        variant: 'destructive'
+        title: 'Prediction failed',
+        description: message,
+        variant: 'destructive',
       });
       setPrediction(null);
     } finally {

@@ -117,6 +117,54 @@ export const getPrediction = async (homeTeam: string, awayTeam: string): Promise
   };
 };
 
+// WC 2026 single-match prediction.
+//
+// Calls the FIFA-Elo Phase 1 backend route (`POST /wc2026/predict`) instead
+// of the PSL `/predict` model — the PSL model only knows PSL clubs and
+// returns near-uniform probabilities for national teams. The response
+// envelope mirrors `/predict` so we can reuse the same transformer.
+//
+// Backend rejects unknown team names with HTTP 400 — surface a clear
+// "team not supported" message so the user understands why.
+export const getWc2026Prediction = async (
+  homeTeam: string,
+  awayTeam: string,
+): Promise<PredictionResponse> => {
+  const response = await fetch(`${API_BASE_URL}/wc2026/predict`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      home_team: homeTeam,
+      away_team: awayTeam,
+    }),
+  });
+
+  if (!response.ok) {
+    devError('WC2026 prediction request failed:', response.status, response.statusText);
+    if (response.status === 400) {
+      const errorBody = await response.json().catch(() => ({}));
+      throw new Error(errorBody?.detail || 'One of the teams is not in the FIFA ranking table.');
+    }
+    if (response.status === 429) {
+      throw new Error('Too many predictions in a short time. Please wait a moment.');
+    }
+    throw new Error('Unable to generate prediction. Please try again later.');
+  }
+
+  const data = await response.json();
+  return {
+    home_team: data.home_team,
+    away_team: data.away_team,
+    home_win: data.probabilities?.Home || 0,
+    draw: data.probabilities?.Draw || 0,
+    away_win: data.probabilities?.Away || 0,
+    prediction: normalizePrediction(data.predicted_outcome || ''),
+    confidence: confidenceToString(data.confidence || 0),
+  };
+};
+
 // Helper function to parse date and extract date/time strings
 const parseFixtureDate = (dateStr: string): { date: string; time: string } => {
   try {
