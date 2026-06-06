@@ -129,36 +129,39 @@ const parseFixtureDate = (dateStr: string): { date: string; time: string } => {
   }
 };
 
-// Determine if a WC2026 match is "hot" — uses FIFA tier-1 nations + confidence.
+// Helper function to determine if match is "hot" (high-profile FIFA nations or high confidence)
 const isHotMatch = (homeTeam: string, awayTeam: string, confidence?: number): boolean => {
-  const tierOneNations = [
+  const hotMatchTeams = [
     'Argentina',
-    'Brazil',
     'France',
-    'England',
     'Spain',
+    'England',
+    'Brazil',
     'Portugal',
-    'Germany',
     'Netherlands',
-    'Belgium',
+    'Germany',
     'Italy',
+    'Belgium',
     'Croatia',
-    'Uruguay',
-    'Colombia',
+    'Morocco',
     'USA',
     'Mexico',
+    'Canada',
   ];
-
-  const normalize = (team: string) => team.toLowerCase().trim();
-  const normalizedHome = normalize(homeTeam);
-  const normalizedAway = normalize(awayTeam);
-
-  const isMarquee = tierOneNations.some((nation) => {
-    const n = normalize(nation);
-    return normalizedHome === n || normalizedAway === n;
+  
+  const normalizeTeam = (team: string) => team.toLowerCase().trim();
+  const normalizedHome = normalizeTeam(homeTeam);
+  const normalizedAway = normalizeTeam(awayTeam);
+  
+  const isHotTeam = hotMatchTeams.some(team => {
+    const normalizedHotTeam = normalizeTeam(team);
+    return normalizedHome.includes(normalizedHotTeam) || 
+           normalizedAway.includes(normalizedHotTeam) ||
+           normalizedHotTeam.includes(normalizedHome) ||
+           normalizedHotTeam.includes(normalizedAway);
   });
-
-  return isMarquee || (confidence !== undefined && confidence > 0.6);
+  
+  return isHotTeam || (confidence !== undefined && confidence > 0.5);
 };
 
 // Fixtures API

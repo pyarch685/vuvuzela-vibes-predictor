@@ -2,6 +2,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { UserFeedbackModal } from './UserFeedbackModal';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface FixtureCardProps {
   id?: number;
@@ -46,9 +47,14 @@ export const FixtureCard = ({
 
       {/* Hot match badge */}
       {isHotMatch && (
-        <Badge className="absolute top-2 right-4 bg-accent text-accent-foreground animate-pulse">
-          🔥 Hot Match
-        </Badge>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge className="absolute top-2 right-4 bg-accent text-accent-foreground animate-pulse cursor-help">
+              🔥 Hot Match
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent>High-stakes fixture trending with fans this week</TooltipContent>
+        </Tooltip>
       )}
 
       <div className="pl-4 pr-4">
@@ -81,14 +87,24 @@ export const FixtureCard = ({
         {prediction && (
           <div className="mt-3 pt-3 border-t border-border/50">
             <div className="flex justify-between items-center text-sm">
-              <div className="flex gap-2">
-                <span className="text-primary">{(prediction.homeWin * 100).toFixed(0)}%</span>
-                <span className="text-secondary">{(prediction.draw * 100).toFixed(0)}%</span>
-                <span className="text-accent">{(prediction.awayWin * 100).toFixed(0)}%</span>
-              </div>
-              <Badge variant="outline" className="text-secondary border-secondary/50">
-                📊 {prediction.predicted}
-              </Badge>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex gap-2 cursor-help">
+                    <span className="text-primary">{(prediction.homeWin * 100).toFixed(0)}%</span>
+                    <span className="text-secondary">{(prediction.draw * 100).toFixed(0)}%</span>
+                    <span className="text-accent">{(prediction.awayWin * 100).toFixed(0)}%</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>Home win • Draw • Away win probabilities from our AI</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="outline" className="text-secondary border-secondary/50 cursor-help">
+                    📊 {prediction.predicted}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>Our most likely outcome based on team form</TooltipContent>
+              </Tooltip>
             </div>
           </div>
         )}

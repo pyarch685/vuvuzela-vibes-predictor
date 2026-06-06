@@ -10,6 +10,7 @@ import {
 } from '@wc/lib/api';
 import { buildItemKey } from '@wc/lib/pricing';
 import { devLog } from '@wc/lib/logger';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface GroupPredictionsProps {
   groupName: string;
@@ -97,20 +98,34 @@ export const GroupPredictions = ({ groupName }: GroupPredictionsProps) => {
             <div className="flex justify-between items-center mb-1">
               <span className="font-medium">{label}</span>
               {isFree && (
-                <span className="text-[10px] uppercase tracking-wide text-accent">
-                  Free
-                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-[10px] uppercase tracking-wide text-accent cursor-help">
+                      Free
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    First 2 group predictions are free — preview the model before unlocking.
+                  </TooltipContent>
+                </Tooltip>
               )}
             </div>
             {m.prediction ? (
-              <div className="flex gap-3 text-xs text-muted-foreground">
-                <span>1: {(m.prediction.home_win * 100).toFixed(0)}%</span>
-                <span>X: {(m.prediction.draw * 100).toFixed(0)}%</span>
-                <span>2: {(m.prediction.away_win * 100).toFixed(0)}%</span>
-                <span className="ml-auto text-secondary font-semibold">
-                  {m.prediction.predicted}
-                </span>
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex gap-3 text-xs text-muted-foreground cursor-help">
+                    <span>1: {(m.prediction.home_win * 100).toFixed(0)}%</span>
+                    <span>X: {(m.prediction.draw * 100).toFixed(0)}%</span>
+                    <span>2: {(m.prediction.away_win * 100).toFixed(0)}%</span>
+                    <span className="ml-auto text-secondary font-semibold">
+                      {m.prediction.predicted}
+                    </span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  Home win • Draw • Away win probabilities from our AI model
+                </TooltipContent>
+              </Tooltip>
             ) : (
               <p className="text-xs text-muted-foreground">Prediction pending</p>
             )}

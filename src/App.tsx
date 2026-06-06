@@ -16,6 +16,15 @@ import WcResetPassword from "./wc2026/pages/ResetPassword";
 
 const queryClient = new QueryClient();
 
+// Wraps any WC2026 surface in the .wc2026-theme scope so all CSS variables
+// (Tailwind/shadcn) resolve to the World Cup navy palette. PSL routes bypass
+// this wrapper entirely and continue to resolve variables from :root.
+const WcShell = ({ children }: { children: React.ReactNode }) => (
+  <div className="wc2026-theme min-h-screen bg-background text-foreground">
+    {children}
+  </div>
+);
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -27,14 +36,14 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/benchmark" element={<Benchmark />} />
 
-          {/* WC2026 surface */}
-          <Route path="/wc2026" element={<WcIndex />} />
-          <Route path="/wc2026/groups" element={<WcGroups />} />
-          <Route path="/wc2026/benchmark" element={<WcBenchmark />} />
+          {/* WC2026 surface — wrapped in WcShell for the navy theme */}
+          <Route path="/wc2026" element={<WcShell><WcIndex /></WcShell>} />
+          <Route path="/wc2026/groups" element={<WcShell><WcGroups /></WcShell>} />
+          <Route path="/wc2026/benchmark" element={<WcShell><WcBenchmark /></WcShell>} />
 
-          {/* Shared auth flows — WC2026's reset-password screen also serves PSL users */}
-          <Route path="/forgot-password" element={<WcForgotPassword />} />
-          <Route path="/reset-password" element={<WcResetPassword />} />
+          {/* Shared auth flows — render in WC2026 theme */}
+          <Route path="/forgot-password" element={<WcShell><WcForgotPassword /></WcShell>} />
+          <Route path="/reset-password" element={<WcShell><WcResetPassword /></WcShell>} />
 
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

@@ -1,5 +1,6 @@
 import { StadiumCard } from './StadiumCard';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface PredictionResultProps {
   homeTeam: string;
@@ -65,14 +66,21 @@ export const PredictionResult = ({
         </div>
         <div className="flex items-center justify-center gap-2 text-lg">
           <span className="text-muted-foreground">Confidence:</span>
-          <span className={cn(
-            'font-bold px-3 py-1 rounded-full',
-            confidence === 'High' && 'bg-primary/30 text-primary',
-            confidence === 'Medium' && 'bg-secondary/30 text-secondary',
-            confidence === 'Low' && 'bg-accent/30 text-accent',
-          )}>
-            {confidence}
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className={cn(
+                'font-bold px-3 py-1 rounded-full cursor-help',
+                confidence === 'High' && 'bg-primary/30 text-primary',
+                confidence === 'Medium' && 'bg-secondary/30 text-secondary',
+                confidence === 'Low' && 'bg-accent/30 text-accent',
+              )}>
+                {confidence}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              How sure the model is — High means strong signal, Low means a close call
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 

@@ -54,10 +54,11 @@ const Index = () => {
           { name: 'Canada', value: 'canada' },
           { name: 'Cabo Verde', value: 'cabo_verde' },
           { name: 'Colombia', value: 'colombia' },
+          { name: 'Congo DR', value: 'congo_dr' },
+          { name: "Côte d'Ivoire", value: 'cote_divoire' },
           { name: 'Croatia', value: 'croatia' },
           { name: 'Curacao', value: 'curacao' },
           { name: 'Czechia', value: 'czechia' },
-          { name: 'Congo DR', value: 'congo_dr' },
           { name: 'Ecuador', value: 'ecuador' },
           { name: 'Egypt', value: 'egypt' },
           { name: 'England', value: 'england' },
@@ -67,7 +68,6 @@ const Index = () => {
           { name: 'Haiti', value: 'haiti' },
           { name: 'IR Iran', value: 'ir_iran' },
           { name: 'Iraq', value: 'iraq' },
-          { name: "Côte d'Ivoire", value: 'cote_divoire' },
           { name: 'Japan', value: 'japan' },
           { name: 'Jordan', value: 'jordan' },
           { name: 'Mexico', value: 'mexico' },
@@ -243,14 +243,12 @@ const Index = () => {
         confidence: result.confidence,
       });
     } catch (error) {
-      // NEVER surface fake probabilities to users — clear any previous
-      // prediction and let the user retry.
-      setPrediction(null);
       toast({
-        title: 'Prediction unavailable',
-        description: 'Could not reach the prediction service. Please try again shortly.',
-        variant: 'destructive',
+        title: 'Connection Error',
+        description: 'Could not connect to the prediction service. Please try again shortly.',
+        variant: 'destructive'
       });
+      setPrediction(null);
     } finally {
       setIsLoading(false);
     }
