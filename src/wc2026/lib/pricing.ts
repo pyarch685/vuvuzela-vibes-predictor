@@ -28,5 +28,38 @@ export const UNLOCK_LABELS: Record<UnlockKind, string> = {
   final: 'Final prediction',
 };
 
+// What data is hidden and what unlocking reveals for each kind.
+export const UNLOCK_DESCRIPTIONS: Record<UnlockKind, { hidden: string; reveals: string }> = {
+  group_match: {
+    hidden: 'Home win • Draw • Away win probabilities and predicted result are concealed.',
+    reveals: 'Unlock AI-generated match probabilities and the most likely outcome.',
+  },
+  group_winner: {
+    hidden: 'The AI-predicted group winner and confidence percentage are concealed.',
+    reveals: 'Reveal which team the model picks to top the group and its win probability.',
+  },
+  round_of_32: {
+    hidden: 'Knockout match probabilities and predicted winner are concealed.',
+    reveals: 'Unlock AI probabilities for this Round of 32 fixture.',
+  },
+  quarter_final: {
+    hidden: 'Quarter-final probabilities and predicted winner are concealed.',
+    reveals: 'Unlock AI probabilities for this quarter-final match.',
+  },
+  semi_final: {
+    hidden: 'Semi-final probabilities and predicted winner are concealed.',
+    reveals: 'Unlock AI probabilities for this semi-final match.',
+  },
+  third_place: {
+    hidden: '3rd-place playoff probabilities and predicted winner are concealed.',
+    reveals: 'Unlock AI probabilities for the 3rd/4th place playoff.',
+  },
+  final: {
+    hidden: 'Final match probabilities and predicted World Cup winner are concealed.',
+    reveals: 'Unlock AI probabilities for the FIFA World Cup 2026 final.',
+  },
+};
+
+
 // Stable item key used as the Paystack metadata identifier and unlocks key.
 export const buildItemKey = (kind: UnlockKind, ref: string) => `${kind}:${ref}`;

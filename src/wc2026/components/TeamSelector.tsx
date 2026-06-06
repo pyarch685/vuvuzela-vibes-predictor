@@ -14,8 +14,9 @@ interface TeamSelectorProps {
   placeholder?: string;
 }
 
-// PSL-specific brand colours dropped for WC2026 — keep a generic accent.
-const getTeamColors = (_teamName: string): string => 'border-l-4 border-l-primary';
+const getTeamColors = (_teamName: string): string => {
+  return 'border-l-4 border-l-primary';
+};
 
 export const TeamSelector = ({ 
   teams, 

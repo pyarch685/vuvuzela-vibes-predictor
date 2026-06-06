@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { registerUser, loginUser, logoutUser, isAuthenticated } from '@wc/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 const REMEMBER_KEY = 'wc2026_remembered_creds';
 
@@ -184,78 +185,107 @@ export const NavHeader = () => {
           <span className="font-display text-xl font-bold text-foreground">WC 2026 <span className="text-accent">Predictor</span></span>
         </div>
 
-        {/* Nav Links — WC2026 routes are nested under /wc2026 in the tabbed app */}
+        {/* Nav Links */}
         <div className="flex items-center gap-1">
-          <Button
-            variant={location.pathname === '/wc2026' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => navigate('/wc2026')}
-            className="gap-1"
-          >
-            ⚽ <span className="hidden sm:inline">Predictor</span>
-          </Button>
-          <Button
-            variant={location.pathname === '/wc2026/groups' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => navigate('/wc2026/groups')}
-            className="gap-1"
-          >
-            🏆 <span className="hidden sm:inline">Groups</span>
-          </Button>
-          <Button
-            variant={location.pathname === '/wc2026/benchmark' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => navigate('/wc2026/benchmark')}
-            className="gap-1"
-          >
-            <BarChart3 className="h-4 w-4" />
-            <span className="hidden sm:inline">Benchmark</span>
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate('/')}
-            className="gap-1"
-          >
-            <span className="hidden sm:inline">← PSL</span>
-            <span className="sm:hidden">PSL</span>
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/')}
+                className="gap-1"
+              >
+                ← <span className="hidden sm:inline">PSL</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Back to the PSL predictor</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={location.pathname === '/wc2026' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => navigate('/wc2026')}
+                className="gap-1"
+              >
+                ⚽ <span className="hidden sm:inline">Predictor</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Pick two teams and get an AI match prediction</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={location.pathname === '/wc2026/groups' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => navigate('/wc2026/groups')}
+                className="gap-1"
+              >
+                🏆 <span className="hidden sm:inline">Groups</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Browse WC 2026 group stage fixtures and standings</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={location.pathname === '/wc2026/benchmark' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => navigate('/wc2026/benchmark')}
+                className="gap-1"
+              >
+                <BarChart3 className="h-4 w-4" />
+                <span className="hidden sm:inline">Benchmark</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Track how our model performs vs real WC 2026 results</TooltipContent>
+          </Tooltip>
         </div>
 
         {/* Auth Buttons */}
         <div className="flex items-center gap-1">
           {loggedIn ? (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="gap-2"
-              onClick={() => {
-                logoutUser();
-                // Keep username/email prefilled, but always drop stored password on logout
-                const r = loadRemembered();
-                saveRemembered({ username: r.username, email: r.email, remember: false });
-                setPassword('');
-                setRememberMe(false);
-                setLoggedIn(false);
-                window.dispatchEvent(new Event('auth-changed'));
-                toast({
-                  title: 'Logged out',
-                  description: 'You have been successfully logged out.',
-                });
-              }}
-            >
-              <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline">Logout</span>
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="gap-2"
+                  onClick={() => {
+                    logoutUser();
+                    // Keep username/email prefilled, but always drop stored password on logout
+                    const r = loadRemembered();
+                    saveRemembered({ username: r.username, email: r.email, remember: false });
+                    setPassword('');
+                    setRememberMe(false);
+                    setLoggedIn(false);
+                    window.dispatchEvent(new Event('auth-changed'));
+                    toast({
+                      title: 'Logged out',
+                      description: 'You have been successfully logged out.',
+                    });
+                  }}
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span className="hidden sm:inline">Logout</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Sign out of your account</TooltipContent>
+            </Tooltip>
           ) : (
             <>
               {/* Login Dialog */}
               <Dialog open={isLoginOpen} onOpenChange={setIsLoginOpen}>
             <DialogTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-2">
-                <LogIn className="h-4 w-4" />
-                <span className="hidden sm:inline">Login</span>
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-2">
+                    <LogIn className="h-4 w-4" />
+                    <span className="hidden sm:inline">Login</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Sign in to save predictions and unlock content</TooltipContent>
+              </Tooltip>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
@@ -358,10 +388,15 @@ export const NavHeader = () => {
           {/* Register Dialog */}
           <Dialog open={isRegisterOpen} onOpenChange={setIsRegisterOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2 border-primary/50 hover:bg-primary/10">
-                <User className="h-4 w-4" />
-                <span className="hidden sm:inline">Register</span>
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2 border-primary/50 hover:bg-primary/10">
+                    <User className="h-4 w-4" />
+                    <span className="hidden sm:inline">Register</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Create a free account to start predicting</TooltipContent>
+              </Tooltip>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>

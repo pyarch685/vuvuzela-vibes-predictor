@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&family=Oswald:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Ubuntu:wght@400;500;700&family=Oswald:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -111,6 +111,72 @@
     --sidebar-accent-foreground: 45 100% 88%;
     --sidebar-border: 145 40% 20%;
     --sidebar-ring: 45 93% 47%;
+  }
+
+  /* WC 2026 World Cup theme — scoped to descendants of .wc2026-theme.
+     Overrides every CSS variable used by Tailwind/shadcn so the WC surface
+     re-themes without touching :root or the PSL palette. */
+  .wc2026-theme {
+    --background: 220 56% 6%;
+    --foreground: 0 0% 96%;
+
+    --card: 220 45% 10%;
+    --card-foreground: 0 0% 96%;
+
+    --popover: 220 50% 8%;
+    --popover-foreground: 0 0% 96%;
+
+    --primary: 217 100% 28%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 217 91% 60%;
+    --secondary-foreground: 0 0% 100%;
+
+    --accent: 354 96% 47%;
+    --accent-foreground: 0 0% 100%;
+
+    --muted: 220 30% 18%;
+    --muted-foreground: 0 0% 70%;
+
+    --destructive: 354 96% 47%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 40% 22%;
+    --input: 220 40% 16%;
+    --ring: 217 91% 60%;
+
+    /* Legacy SA tokens remapped to host-nation accents so any latent
+       reference inside the synced code still resolves correctly. */
+    --sa-green: 158 100% 19%;
+    --sa-gold: 0 0% 100%;
+    --sa-red: 354 96% 47%;
+    --sa-blue: 217 100% 22%;
+    --sa-black: 220 56% 5%;
+    --sa-white: 0 0% 100%;
+
+    /* New tri-nation tokens used by HeroSection.tsx */
+    --mx-green: 158 100% 19%;
+    --us-blue: 217 100% 22%;
+    --can-red: 354 96% 47%;
+
+    --stadium-glow: 217 91% 60%;
+    --pitch-green: 158 80% 14%;
+    --floodlight: 0 0% 95%;
+
+    --sidebar-background: 220 50% 8%;
+    --sidebar-foreground: 0 0% 96%;
+    --sidebar-primary: 217 100% 28%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 40% 14%;
+    --sidebar-accent-foreground: 0 0% 96%;
+    --sidebar-border: 220 40% 22%;
+    --sidebar-ring: 217 91% 60%;
+
+    font-family: 'Inter', sans-serif;
+  }
+
+  .wc2026-theme :is(h1, h2, h3, h4, h5, h6) {
+    font-family: 'Oswald', sans-serif;
   }
 }
 
