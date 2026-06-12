@@ -1,13 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { devLog, devError } from '@wc/lib/logger';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Confetti } from '@wc/components/Confetti';
 import { FloatingElements } from '@wc/components/FloatingElements';
 import { HeroSection } from '@wc/components/HeroSection';
 import { StadiumCard } from '@wc/components/StadiumCard';
-import { TeamSelector } from '@wc/components/TeamSelector';
-import { PredictionResult } from '@wc/components/PredictionResult';
 import { FixtureCard } from '@wc/components/FixtureCard';
 import { Footer } from '@wc/components/Footer';
 import { NavHeader } from '@wc/components/NavHeader';
@@ -15,9 +13,24 @@ import { TwitterSidebar } from '@wc/components/TwitterSidebar';
 import { SponsorPlaceholder } from '@wc/components/SponsorPlaceholder';
 import { SponsorBanner } from '@wc/components/SponsorBanner';
 import { LoginPrompt } from '@wc/components/LoginPrompt';
-import { useToast } from '@/hooks/use-toast';
-import { getWc2026Prediction, getWc2026Fixtures, getModelStatus, getTeams, Wc2026Fixture, ModelStatus, Team, isAuthenticated, API_HOST_LABEL } from '@wc/lib/api';
+import { GroupPredictPanel } from '@wc/components/GroupPredictPanel';
+import {
+  getWc2026Fixtures,
+  getModelStatus,
+  getMyWc2026Predictions,
+  Wc2026Fixture,
+  ModelStatus,
+  Wc2026UserPrediction,
+  isAuthenticated,
+  API_HOST_LABEL,
+} from '@wc/lib/api';
 import { Loader2 } from 'lucide-react';
+
+const WC2026_GROUP_NAMES = [
+  'Group A', 'Group B', 'Group C', 'Group D',
+  'Group E', 'Group F', 'Group G', 'Group H',
+  'Group I', 'Group J', 'Group K', 'Group L',
+] as const;
 
 /** Group an already-chronologically-sorted fixture list by ISO match_date. */
 const groupFixturesByDate = (
@@ -57,85 +70,18 @@ const formatDateHeading = (iso: string): string => {
 };
 
 const Index = () => {
-  const [homeTeam, setHomeTeam] = useState('');
-  const [awayTeam, setAwayTeam] = useState('');
-  const [prediction, setPrediction] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [fixtures, setFixtures] = useState<Wc2026Fixture[]>([]);
   const [fixturesLoading, setFixturesLoading] = useState(false);
   const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [teamsLoading, setTeamsLoading] = useState(true);
   const [authenticated, setAuthenticated] = useState(isAuthenticated());
-  const { toast } = useToast();
 
-  // Fetch teams on mount
-  useEffect(() => {
-    const fetchTeams = async () => {
-      setTeamsLoading(true);
-      try {
-        const data = await getTeams();
-        setTeams(data);
-      } catch (error) {
-        devLog('Backend not available, using fallback teams');
-        // Fallback teams if backend unavailable
-        setTeams([
-          { name: 'Algeria', value: 'algeria' },
-          { name: 'Argentina', value: 'argentina' },
-          { name: 'Australia', value: 'australia' },
-          { name: 'Austria', value: 'austria' },
-          { name: 'Belgium', value: 'belgium' },
-          { name: 'Bosnia and Herzegovina', value: 'bosnia_and_herzegovina' },
-          { name: 'Brazil', value: 'brazil' },
-          { name: 'Canada', value: 'canada' },
-          { name: 'Cabo Verde', value: 'cabo_verde' },
-          { name: 'Colombia', value: 'colombia' },
-          { name: 'Congo DR', value: 'congo_dr' },
-          { name: "Côte d'Ivoire", value: 'cote_divoire' },
-          { name: 'Croatia', value: 'croatia' },
-          { name: 'Curacao', value: 'curacao' },
-          { name: 'Czechia', value: 'czechia' },
-          { name: 'Ecuador', value: 'ecuador' },
-          { name: 'Egypt', value: 'egypt' },
-          { name: 'England', value: 'england' },
-          { name: 'France', value: 'france' },
-          { name: 'Germany', value: 'germany' },
-          { name: 'Ghana', value: 'ghana' },
-          { name: 'Haiti', value: 'haiti' },
-          { name: 'IR Iran', value: 'ir_iran' },
-          { name: 'Iraq', value: 'iraq' },
-          { name: 'Japan', value: 'japan' },
-          { name: 'Jordan', value: 'jordan' },
-          { name: 'Mexico', value: 'mexico' },
-          { name: 'Morocco', value: 'morocco' },
-          { name: 'Netherlands', value: 'netherlands' },
-          { name: 'New Zealand', value: 'new_zealand' },
-          { name: 'Norway', value: 'norway' },
-          { name: 'Panama', value: 'panama' },
-          { name: 'Paraguay', value: 'paraguay' },
-          { name: 'Portugal', value: 'portugal' },
-          { name: 'Qatar', value: 'qatar' },
-          { name: 'Saudi Arabia', value: 'saudi_arabia' },
-          { name: 'Scotland', value: 'scotland' },
-          { name: 'Senegal', value: 'senegal' },
-          { name: 'South Africa', value: 'south_africa' },
-          { name: 'Korea Republic', value: 'korea_republic' },
-          { name: 'Spain', value: 'spain' },
-          { name: 'Sweden', value: 'sweden' },
-          { name: 'Switzerland', value: 'switzerland' },
-          { name: 'Tunisia', value: 'tunisia' },
-          { name: 'Türkiye', value: 'turkiye' },
-          { name: 'USA', value: 'usa' },
-          { name: 'Uruguay', value: 'uruguay' },
-          { name: 'Uzbekistan', value: 'uzbekistan' },
-        ]);
-      } finally {
-        setTeamsLoading(false);
-      }
-    };
-    fetchTeams();
-  }, []);
+  // Predict-tab state — selected group + the user's saved picks across
+  // all groups. We load saved picks once per auth session and let the
+  // GroupPredictPanel filter to the active group locally.
+  const [selectedGroup, setSelectedGroup] = useState<string>('Group A');
+  const [myPredictions, setMyPredictions] = useState<Wc2026UserPrediction[]>([]);
+  const [myPredictionsLoaded, setMyPredictionsLoaded] = useState(false);
 
   // Track if we've attempted to fetch fixtures
   const hasFetchedRef = useRef(false);
@@ -250,47 +196,33 @@ const Index = () => {
     }
   };
 
-  const handlePredict = async () => {
-    if (!homeTeam || !awayTeam) {
-      toast({ title: 'Eish!', description: 'Please select both teams', variant: 'destructive' });
+  // Load the user's saved WC2026 picks once per auth session so the
+  // Predict tab can pre-fill the H/D/A pickers without a per-group
+  // round-trip.
+  useEffect(() => {
+    if (!authenticated) {
+      setMyPredictions([]);
+      setMyPredictionsLoaded(false);
       return;
     }
-    if (homeTeam === awayTeam) {
-      toast({ title: 'Haibo!', description: 'Teams cannot be the same', variant: 'destructive' });
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      // Get team names from teams list
-      const homeTeamName = teams.find(t => t.value === homeTeam)?.name || homeTeam;
-      const awayTeamName = teams.find(t => t.value === awayTeam)?.name || awayTeam;
-
-      // Route through the WC2026 FIFA-Elo endpoint, not the PSL /predict
-      // model — the PSL classifier returns near-uniform probabilities for
-      // national teams it has never seen during training.
-      const result = await getWc2026Prediction(homeTeamName, awayTeamName);
-      setPrediction({
-        homeTeam: result.home_team,
-        awayTeam: result.away_team,
-        homeWin: result.home_win,
-        draw: result.draw,
-        awayWin: result.away_win,
-        prediction: result.prediction,
-        confidence: result.confidence,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Could not connect to the prediction service.';
-      toast({
-        title: 'Prediction failed',
-        description: message,
-        variant: 'destructive',
-      });
-      setPrediction(null);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    let mounted = true;
+    (async () => {
+      try {
+        const data = await getMyWc2026Predictions();
+        if (mounted) {
+          setMyPredictions(data);
+          setMyPredictionsLoaded(true);
+        }
+      } catch (err) {
+        devError('Failed to load saved predictions', err);
+        if (mounted) {
+          setMyPredictions([]);
+          setMyPredictionsLoaded(true);
+        }
+      }
+    })();
+    return () => { mounted = false; };
+  }, [authenticated]);
 
   return (
       <div className="min-h-screen stadium-gradient relative overflow-hidden">
@@ -327,44 +259,52 @@ const Index = () => {
                   {!authenticated ? (
                     <LoginPrompt title="Predict Locked" />
                   ) : (
-                    <>
-                      <StadiumCard title="Single Match Prediction">
-                        {teamsLoading ? (
-                          <div className="flex justify-center py-8">
-                            <Loader2 className="h-8 w-8 animate-spin text-secondary" />
-                          </div>
-                        ) : (
-                          <>
-                            <div className="grid md:grid-cols-2 gap-6 mb-6">
-                              <TeamSelector teams={teams} value={homeTeam} onChange={setHomeTeam} label="Home Team" placeholder="Select home team" />
-                              <TeamSelector teams={teams} value={awayTeam} onChange={setAwayTeam} label="Away Team" placeholder="Select away team" />
-                            </div>
-                            <div className="flex justify-center">
-                              <Button 
-                                onClick={handlePredict} 
-                                disabled={isLoading || teamsLoading || teams.length === 0}
-                                className="px-12 py-6 text-xl relative overflow-hidden transition-all duration-300 bg-gradient-to-r from-secondary via-accent to-secondary hover:from-accent hover:via-secondary hover:to-accent text-secondary-foreground font-display font-bold shadow-lg hover:shadow-xl hover:shadow-secondary/30 border-2 border-secondary/50"
-                              >
-                                <span className="relative z-10 flex items-center gap-2">
-                                  {isLoading ? (
-                                    <>
-                                      <span className="animate-spin">⚽</span>
-                                      Loading...
-                                    </>
-                                  ) : (
-                                    <>
-                                      📣 Get Prediction
-                                    </>
-                                  )}
-                                </span>
-                              </Button>
-                            </div>
-                          </>
-                        )}
-                      </StadiumCard>
+                    <StadiumCard title="Predict the Group Stage">
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Pick a Home / Draw / Away outcome for every match in a WC2026 group.
+                        Each pick stays editable right up until that match kicks off.
+                      </p>
 
-                      {prediction && <PredictionResult {...prediction} />}
-                    </>
+                      <div className="mb-6 max-w-xs">
+                        <label className="block text-sm font-display text-muted-foreground mb-1">
+                          Group
+                        </label>
+                        <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+                          <SelectTrigger className="bg-card/60 border-secondary/30">
+                            <SelectValue placeholder="Select a group" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {WC2026_GROUP_NAMES.map((g) => {
+                              const saved = myPredictions.filter((p) => p.group_name === g).length;
+                              return (
+                                <SelectItem key={g} value={g}>
+                                  {g}
+                                  {saved > 0 && (
+                                    <span className="ml-2 text-xs text-green-400">
+                                      · {saved} saved
+                                    </span>
+                                  )}
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {!myPredictionsLoaded ? (
+                        <div className="flex justify-center py-8">
+                          <Loader2 className="h-8 w-8 animate-spin text-secondary" />
+                        </div>
+                      ) : (
+                        <GroupPredictPanel
+                          groupName={selectedGroup}
+                          myPicksForGroup={myPredictions.filter(
+                            (p) => p.group_name === selectedGroup,
+                          )}
+                          onSaved={setMyPredictions}
+                        />
+                      )}
+                    </StadiumCard>
                   )}
                 </TabsContent>
 

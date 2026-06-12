@@ -827,6 +827,113 @@ export const getUserUnlocks = async (): Promise<string[]> => {
 };
 
 // =====================================================================
+// WC2026 Teams (used by /wc2026 Predict tab)
+// =====================================================================
+
+export interface Wc2026TeamsResponse {
+  teams: string[];
+}
+
+export const getWc2026Teams = async (): Promise<Team[]> => {
+  const response = await fetch(`${API_BASE_URL}/wc2026/teams`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!response.ok) {
+    devError('WC2026 teams request failed:', response.status, response.statusText);
+    throw new Error('Unable to load WC2026 teams.');
+  }
+  const data: Wc2026TeamsResponse = await response.json();
+  return (data.teams || []).map((name) => ({
+    name,
+    // Match the value-encoding convention used by getTeams() so the
+    // existing TeamSelector continues to round-trip names <-> values.
+    value: name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''),
+  }));
+};
+
+
+// =====================================================================
+// WC2026 Per-User Predictions (used by /wc2026 Predict tab)
+// =====================================================================
+
+export type WcOutcome = 'Home' | 'Draw' | 'Away';
+
+export interface Wc2026UserPrediction {
+  fixture_id: number;
+  group_name?: string | null;
+  match_date: string;
+  kickoff_time?: string | null;
+  home_team: string;
+  away_team: string;
+  status: 'scheduled' | 'live' | 'completed' | string;
+  home_goals?: number | null;
+  away_goals?: number | null;
+  predicted_outcome: WcOutcome;
+  locked: boolean;
+  updated_at: string;
+}
+
+export interface Wc2026UserPredictionsResponse {
+  predictions: Wc2026UserPrediction[];
+}
+
+export interface Wc2026GroupPredictionPick {
+  fixture_id: number;
+  predicted_outcome: WcOutcome;
+}
+
+export const getMyWc2026Predictions = async (): Promise<Wc2026UserPrediction[]> => {
+  const response = await fetch(`${API_BASE_URL}/wc2026/predictions`, {
+    method: 'GET',
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Session expired. Please log in again.');
+    }
+    throw new Error('Unable to load your saved predictions.');
+  }
+  const data: Wc2026UserPredictionsResponse = await response.json();
+  return data.predictions || [];
+};
+
+/**
+ * Bulk upsert the user's picks for a single WC2026 group. The backend
+ * validates each pick against the group's fixtures and rejects the whole
+ * request (no partial writes) if any pick references the wrong group or
+ * a match that has already kicked off.
+ *
+ * Returns the user's complete saved predictions list after the write
+ * so callers don't need a second round-trip to refresh local state.
+ */
+export const saveWc2026GroupPredictions = async (
+  groupName: string,
+  picks: Wc2026GroupPredictionPick[],
+): Promise<Wc2026UserPrediction[]> => {
+  const response = await fetch(
+    `${API_BASE_URL}/wc2026/predictions/group/${encodeURIComponent(groupName)}`,
+    {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify({ picks }),
+    },
+  );
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Session expired. Please log in again.');
+    }
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody?.detail || `Unable to save predictions for ${groupName}.`,
+    );
+  }
+  const data: Wc2026UserPredictionsResponse = await response.json();
+  return data.predictions || [];
+};
+
+
+// =====================================================================
 // WC2026 Tournament-wide Fixtures (used by /wc2026 Fixtures tab)
 // =====================================================================
 //
