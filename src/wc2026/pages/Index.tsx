@@ -16,15 +16,52 @@ import { SponsorPlaceholder } from '@wc/components/SponsorPlaceholder';
 import { SponsorBanner } from '@wc/components/SponsorBanner';
 import { LoginPrompt } from '@wc/components/LoginPrompt';
 import { useToast } from '@/hooks/use-toast';
-import { getWc2026Prediction, getFixtures, getModelStatus, getTeams, Fixture, ModelStatus, Team, isAuthenticated, API_HOST_LABEL } from '@wc/lib/api';
+import { getWc2026Prediction, getWc2026Fixtures, getModelStatus, getTeams, Wc2026Fixture, ModelStatus, Team, isAuthenticated, API_HOST_LABEL } from '@wc/lib/api';
 import { Loader2 } from 'lucide-react';
+
+/** Group an already-chronologically-sorted fixture list by ISO match_date. */
+const groupFixturesByDate = (
+  fixtures: Wc2026Fixture[],
+): Array<[string, Wc2026Fixture[]]> => {
+  const buckets = new Map<string, Wc2026Fixture[]>();
+  for (const fx of fixtures) {
+    const key = fx.match_date;
+    const existing = buckets.get(key);
+    if (existing) existing.push(fx);
+    else buckets.set(key, [fx]);
+  }
+  return Array.from(buckets.entries());
+};
+
+/**
+ * Render an ISO YYYY-MM-DD as e.g. "Today · Friday, Jun 12" / "Tomorrow ..."
+ * / "Friday, Jun 12". Compared at the calendar-date level in local time so
+ * a stadium kickoff at 02:00 UTC the next day still rolls correctly.
+ */
+const formatDateHeading = (iso: string): string => {
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return iso;
+  const target = new Date(y, m - 1, d);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const pretty = target.toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+  });
+  if (diffDays === 0) return `Today · ${pretty}`;
+  if (diffDays === 1) return `Tomorrow · ${pretty}`;
+  if (diffDays === -1) return `Yesterday · ${pretty}`;
+  return pretty;
+};
 
 const Index = () => {
   const [homeTeam, setHomeTeam] = useState('');
   const [awayTeam, setAwayTeam] = useState('');
   const [prediction, setPrediction] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [fixtures, setFixtures] = useState<Fixture[]>([]);
+  const [fixtures, setFixtures] = useState<Wc2026Fixture[]>([]);
   const [fixturesLoading, setFixturesLoading] = useState(false);
   const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
@@ -149,23 +186,20 @@ const Index = () => {
       }
       
       try {
-        const data = await getFixtures(90, 5); // Get next 5 fixtures (90 days to catch future fixtures)
+        // Rolling 7-day window of WC2026 matches starting from today.
+        // The /wc2026/fixtures endpoint is public, but we still gate the
+        // tab behind authentication for now to preserve the existing UX
+        // and unify with the other tabs' permission model.
+        const data = await getWc2026Fixtures({ days: 7 });
         if (mounted) {
-          setFixtures(data);
-          devLog('Fixtures loaded successfully:', data.length);
+          setFixtures(data?.fixtures ?? []);
+          devLog('WC2026 fixtures loaded:', data?.fixtures?.length ?? 0);
         }
       } catch (error) {
-        devError('Failed to fetch fixtures:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Failed to load fixtures';
+        devError('Failed to fetch WC2026 fixtures:', error);
         if (mounted) {
-          hasFetchedRef.current = false; // Allow retry on error
-          if (errorMessage.includes('Authentication required') || errorMessage.includes('401')) {
-            setFixtures([]);
-            // User needs to log in - fixtures will be empty
-          } else {
-            // Other error - show empty state
-            setFixtures([]);
-          }
+          hasFetchedRef.current = false; // allow retry on error
+          setFixtures([]);
         }
       } finally {
         if (mounted) {
@@ -338,30 +372,61 @@ const Index = () => {
                   {!authenticated ? (
                     <LoginPrompt title="Fixtures Locked" />
                   ) : (
-                    <StadiumCard title="Upcoming Fixtures">
+                    <StadiumCard title="Fixtures · Next 7 Days">
                       {fixturesLoading ? (
                         <div className="flex justify-center py-8">
                           <Loader2 className="h-8 w-8 animate-spin text-secondary" />
                         </div>
+                      ) : fixtures.length === 0 ? (
+                        <p className="text-center text-muted-foreground py-8">
+                          No FIFA World Cup 2026 matches scheduled in the next 7 days.
+                        </p>
                       ) : (
-                        <div className="space-y-4">
-                          {fixtures.map((fixture) => (
-                            <FixtureCard 
-                              key={fixture.id} 
-                              id={fixture.id}
-                              homeTeam={fixture.home_team} 
-                              awayTeam={fixture.away_team}
-                              date={fixture.date}
-                              time={fixture.time}
-                              venue={fixture.venue}
-                              isHotMatch={fixture.is_hot_match}
-                              prediction={fixture.prediction ? {
-                                homeWin: fixture.prediction.home_win,
-                                draw: fixture.prediction.draw,
-                                awayWin: fixture.prediction.away_win,
-                                predicted: fixture.prediction.predicted,
-                              } : undefined}
-                            />
+                        <div className="space-y-6">
+                          {groupFixturesByDate(fixtures).map(([dateISO, dayFixtures]) => (
+                            <div key={dateISO}>
+                              <h3 className="font-display text-lg text-secondary mb-3 border-b border-secondary/20 pb-1">
+                                {formatDateHeading(dateISO)}
+                                <span className="ml-2 text-xs text-muted-foreground font-normal">
+                                  {dayFixtures.length} {dayFixtures.length === 1 ? 'match' : 'matches'}
+                                </span>
+                              </h3>
+                              <div className="space-y-3">
+                                {dayFixtures.map((fx) => (
+                                  <FixtureCard
+                                    key={fx.id}
+                                    id={fx.id}
+                                    homeTeam={fx.home_team}
+                                    awayTeam={fx.away_team}
+                                    date={fx.match_date}
+                                    time={fx.kickoff_time || 'TBD'}
+                                    venue={fx.venue || undefined}
+                                    groupLabel={fx.group_name || undefined}
+                                    result={
+                                      (fx.status === 'completed' || fx.status === 'live') &&
+                                      fx.home_goals != null &&
+                                      fx.away_goals != null
+                                        ? {
+                                            homeGoals: fx.home_goals,
+                                            awayGoals: fx.away_goals,
+                                            status: fx.status,
+                                          }
+                                        : undefined
+                                    }
+                                    prediction={
+                                      fx.prediction
+                                        ? {
+                                            homeWin: fx.prediction.home_win,
+                                            draw: fx.prediction.draw,
+                                            awayWin: fx.prediction.away_win,
+                                            predicted: fx.prediction.predicted,
+                                          }
+                                        : undefined
+                                    }
+                                  />
+                                ))}
+                              </div>
+                            </div>
                           ))}
                         </div>
                       )}
