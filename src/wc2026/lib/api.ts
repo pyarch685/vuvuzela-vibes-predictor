@@ -692,7 +692,10 @@ export interface GroupStandingTeam {
   goals_against: number;
   goal_difference: number;
   points: number;
-  rank?: number;
+  // Backend serializes this as JSON `null` (not omitted) for teams in
+  // groups where no matches have been played yet, so the type must
+  // accept null in addition to undefined.
+  rank?: number | null;
 }
 
 export interface GroupStanding {
@@ -717,7 +720,10 @@ const GroupStandingTeamSchema = z.object({
   goals_against: z.number().int().nonnegative(),
   goal_difference: z.number().int(),
   points: z.number().int().nonnegative(),
-  rank: z.number().int().positive().optional(),
+  // `nullish` (= nullable + optional) — backend emits JSON `null` for
+  // teams in groups that haven't kicked off yet. `.optional()` alone
+  // rejects `null` and was silently nuking the entire response.
+  rank: z.number().int().positive().nullish(),
 });
 
 const GroupStandingsResponseSchema = z.object({
