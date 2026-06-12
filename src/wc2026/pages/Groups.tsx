@@ -30,6 +30,11 @@ const STATIC_GROUPS: Record<string, string[]> = {
 type Row = {
   team: string;
   played: number | null;
+  won: number | null;
+  drawn: number | null;
+  lost: number | null;
+  goals_for: number | null;
+  goals_against: number | null;
   gd: number | null;
   pts: number | null;
 };
@@ -99,11 +104,26 @@ const Groups = () => {
       rows = sorted.map((t) => ({
         team: t.team,
         played: t.played,
+        won: t.won,
+        drawn: t.drawn,
+        lost: t.lost,
+        goals_for: t.goals_for,
+        goals_against: t.goals_against,
         gd: t.goal_difference,
         pts: t.points,
       }));
     } else {
-      rows = staticTeams.map((name) => ({ team: name, played: null, gd: null, pts: null }));
+      rows = staticTeams.map((name) => ({
+        team: name,
+        played: null,
+        won: null,
+        drawn: null,
+        lost: null,
+        goals_for: null,
+        goals_against: null,
+        gd: null,
+        pts: null,
+      }));
     }
 
     return (
@@ -120,25 +140,45 @@ const Groups = () => {
         <Table>
           <TableHeader>
             <TableRow className="border-border hover:bg-transparent">
-              <TableHead className="w-8 text-muted-foreground">#</TableHead>
-              <TableHead className="text-muted-foreground">Team</TableHead>
-              <TableHead className="text-center text-muted-foreground w-10">P</TableHead>
-              <TableHead className="text-center text-muted-foreground w-10">GD</TableHead>
-              <TableHead className="text-center text-accent font-bold w-12">Pts</TableHead>
+              <TableHead className="w-6 text-muted-foreground text-xs px-1">#</TableHead>
+              <TableHead className="text-muted-foreground text-xs">Team</TableHead>
+              <TableHead className="text-center text-muted-foreground text-xs w-7 px-1">P</TableHead>
+              <TableHead className="text-center text-muted-foreground text-xs w-7 px-1">W</TableHead>
+              <TableHead className="text-center text-muted-foreground text-xs w-7 px-1">D</TableHead>
+              <TableHead className="text-center text-muted-foreground text-xs w-7 px-1">L</TableHead>
+              <TableHead className="text-center text-muted-foreground text-xs w-8 px-1">GF</TableHead>
+              <TableHead className="text-center text-muted-foreground text-xs w-8 px-1">GA</TableHead>
+              <TableHead className="text-center text-muted-foreground text-xs w-9 px-1">GD</TableHead>
+              <TableHead className="text-center text-accent font-bold text-xs w-9 px-1">Pts</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.map((row, idx) => (
               <TableRow key={row.team} className="border-border">
-                <TableCell className="text-muted-foreground font-mono">{idx + 1}</TableCell>
-                <TableCell className="font-medium">{row.team}</TableCell>
-                <TableCell className="text-center text-muted-foreground">
+                <TableCell className="text-muted-foreground font-mono text-xs px-1">{idx + 1}</TableCell>
+                <TableCell className="font-medium text-sm">{row.team}</TableCell>
+                <TableCell className="text-center text-muted-foreground text-xs px-1">
                   {row.played ?? "-"}
                 </TableCell>
-                <TableCell className="text-center text-muted-foreground">
+                <TableCell className="text-center text-muted-foreground text-xs px-1">
+                  {row.won ?? "-"}
+                </TableCell>
+                <TableCell className="text-center text-muted-foreground text-xs px-1">
+                  {row.drawn ?? "-"}
+                </TableCell>
+                <TableCell className="text-center text-muted-foreground text-xs px-1">
+                  {row.lost ?? "-"}
+                </TableCell>
+                <TableCell className="text-center text-muted-foreground text-xs px-1">
+                  {row.goals_for ?? "-"}
+                </TableCell>
+                <TableCell className="text-center text-muted-foreground text-xs px-1">
+                  {row.goals_against ?? "-"}
+                </TableCell>
+                <TableCell className="text-center text-muted-foreground text-xs px-1">
                   {row.gd != null ? (row.gd > 0 ? `+${row.gd}` : row.gd) : "-"}
                 </TableCell>
-                <TableCell className="text-center font-bold text-accent">
+                <TableCell className="text-center font-bold text-accent text-xs px-1">
                   {row.pts ?? "-"}
                 </TableCell>
               </TableRow>
