@@ -16,10 +16,10 @@ import { LoginPrompt } from '@wc/components/LoginPrompt';
 import { GroupPredictPanel } from '@wc/components/GroupPredictPanel';
 import {
   getWc2026Fixtures,
-  getModelStatus,
+  getWc2026ModelStatus,
   getMyWc2026Predictions,
   Wc2026Fixture,
-  ModelStatus,
+  Wc2026ModelStatus,
   Wc2026UserPrediction,
   isAuthenticated,
   API_HOST_LABEL,
@@ -72,8 +72,9 @@ const formatDateHeading = (iso: string): string => {
 const Index = () => {
   const [fixtures, setFixtures] = useState<Wc2026Fixture[]>([]);
   const [fixturesLoading, setFixturesLoading] = useState(false);
-  const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
+  const [modelStatus, setModelStatus] = useState<Wc2026ModelStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
   const [authenticated, setAuthenticated] = useState(isAuthenticated());
 
   // Predict-tab state — selected group + the user's saved picks across
@@ -172,25 +173,19 @@ const Index = () => {
     };
   }, [authenticated]);
 
-  // Fetch model status
+  // Fetch WC2026 model status on Status-tab click. Hits the public
+  // /wc2026/model/status endpoint (real in-sample metrics), not the PSL
+  // /model/status one — the latter only knows about the PSL classifier.
   const fetchModelStatus = async () => {
-    if (!authenticated) {
-      setModelStatus(null);
-      return;
-    }
-
     setStatusLoading(true);
+    setStatusError(null);
     try {
-      const data = await getModelStatus();
+      const data = await getWc2026ModelStatus();
       setModelStatus(data);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '';
-      if (errorMessage.includes('Session expired') || errorMessage.includes('Authentication required')) {
-        setAuthenticated(false);
-        setModelStatus(null);
-      } else {
-        setModelStatus({ status: 'offline', accuracy: undefined, last_trained: undefined });
-      }
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      setStatusError(message);
+      setModelStatus(null);
     } finally {
       setStatusLoading(false);
     }
@@ -383,32 +378,116 @@ const Index = () => {
                         <div className="flex justify-center py-8">
                           <Loader2 className="h-8 w-8 animate-spin text-secondary" />
                         </div>
-                      ) : (
+                      ) : statusError ? (
                         <div className="text-center py-8">
-                          <div className="text-6xl mb-4">
-                            {modelStatus?.status === 'ready' ? '✅' : modelStatus?.status === 'offline' ? '❌' : '🤖'}
+                          <div className="text-6xl mb-4">❌</div>
+                          <p className="text-xl text-destructive font-display">Status unavailable</p>
+                          <p className="text-sm text-muted-foreground mt-2">{statusError}</p>
+                        </div>
+                      ) : !modelStatus ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          Loading model status…
+                        </div>
+                      ) : (
+                        <div className="py-6 space-y-6">
+                          {/* Headline status pill */}
+                          <div className="text-center">
+                            <div className="text-6xl mb-2">
+                              {modelStatus.status === 'ready' ? '✅' : '❌'}
+                            </div>
+                            <p className="text-xl text-secondary font-display capitalize">
+                              {modelStatus.status === 'ready' ? 'Ready' : 'Unavailable'}
+                            </p>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Serving with{' '}
+                              <span className="font-mono text-foreground">
+                                {modelStatus.serving_with}
+                              </span>
+                              {modelStatus.model_version &&
+                                modelStatus.model_version !== modelStatus.serving_with && (
+                                  <>
+                                    {' '}(artifact:{' '}
+                                    <span className="font-mono">{modelStatus.model_version}</span>)
+                                  </>
+                                )}
+                            </p>
                           </div>
-                          <p className="text-xl text-secondary font-display capitalize">
-                            {modelStatus?.status || 'Click to check status'}
-                          </p>
-                          {modelStatus?.accuracy && (
-                            <p className="text-muted-foreground mt-2">
-                              Accuracy: {(modelStatus.accuracy * 100).toFixed(1)}%
-                            </p>
+
+                          {/* Headline accuracy + caveat */}
+                          {modelStatus.evaluation && (
+                            <div className="text-center border-t border-border pt-4">
+                              <p className="text-5xl font-display text-accent">
+                                {(modelStatus.evaluation.accuracy * 100).toFixed(1)}%
+                              </p>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Argmax-correct rate on the training set (in-sample,{' '}
+                                {modelStatus.evaluation.n_matches.toLocaleString()} matches).
+                              </p>
+                              <p className="text-xs text-muted-foreground/80 mt-2 italic max-w-md mx-auto">
+                                Heads up: in-sample accuracy tends to overstate
+                                real-world performance. A chronological holdout split
+                                is a tracked follow-up.
+                                {modelStatus.evaluation.evaluation_kind === 'in_sample_recomputed' && (
+                                  <>
+                                    {' '}(Recomputed at startup — the current artifact
+                                    predates the bake-in.)
+                                  </>
+                                )}
+                              </p>
+                            </div>
                           )}
-                          {modelStatus?.last_trained && (
-                            <p className="text-muted-foreground mt-1">
-                              Last trained: {modelStatus.last_trained}
-                            </p>
+
+                          {/* Secondary metrics */}
+                          {modelStatus.evaluation && (
+                            <div className="flex justify-center gap-4 text-xs text-muted-foreground flex-wrap">
+                              <span>
+                                Log-loss{' '}
+                                <span className="text-foreground">
+                                  {modelStatus.evaluation.log_loss.toFixed(3)}
+                                </span>
+                              </span>
+                              <span>·</span>
+                              <span>
+                                Brier{' '}
+                                <span className="text-foreground">
+                                  {modelStatus.evaluation.brier.toFixed(3)}
+                                </span>
+                              </span>
+                              <span>·</span>
+                              <span>
+                                Predicted draw rate{' '}
+                                <span className="text-foreground">
+                                  {(modelStatus.evaluation.pred_draw_rate * 100).toFixed(1)}%
+                                </span>
+                              </span>
+                            </div>
                           )}
-                          {modelStatus?.total_predictions && (
-                            <p className="text-muted-foreground mt-1">
-                              Total predictions: {modelStatus.total_predictions.toLocaleString()}
-                            </p>
-                          )}
-                          <p className="text-sm text-muted-foreground/70 mt-4">
-                            Backend: {API_HOST_LABEL}
-                          </p>
+
+                          {/* Footer with provenance */}
+                          <div className="border-t border-border pt-4 text-xs text-muted-foreground/80 space-y-1">
+                            {modelStatus.teams_count !== null && (
+                              <p>
+                                Trained on{' '}
+                                <span className="text-foreground">
+                                  {modelStatus.teams_count}
+                                </span>{' '}
+                                teams across{' '}
+                                <span className="text-foreground">
+                                  {modelStatus.n_matches?.toLocaleString()}
+                                </span>{' '}
+                                aggregated matches.
+                              </p>
+                            )}
+                            {modelStatus.evaluation && (
+                              <p>
+                                Last evaluated:{' '}
+                                <span className="text-foreground">
+                                  {new Date(modelStatus.evaluation.evaluated_at).toLocaleString()}
+                                </span>
+                              </p>
+                            )}
+                            <p>Backend: {API_HOST_LABEL}</p>
+                          </div>
                         </div>
                       )}
                     </StadiumCard>

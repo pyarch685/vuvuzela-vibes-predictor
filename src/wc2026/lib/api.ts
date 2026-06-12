@@ -355,14 +355,71 @@ export const getModelStatus = async (): Promise<ModelStatus> => {
     status = 'offline';
   }
   
-  const accuracy = data.model_params?.calibrated ? 0.75 : undefined;
-  
+  // NOTE: the PSL /model/status endpoint never returned a real accuracy,
+  // and the WC2026 page used to fabricate `0.75` here whenever `calibrated`
+  // was true. Real metrics now live on `/wc2026/model/status` — see
+  // `getWc2026ModelStatus()` below. We keep this function returning the
+  // shape the rest of the codebase expects, just without the lie.
   return {
     status,
-    accuracy,
+    accuracy: undefined,
     last_trained: data.model_params ? new Date().toISOString() : undefined,
     total_predictions: data.teams_count,
   };
+};
+
+
+// =====================================================================
+// WC2026 Model Status (used by /wc2026 Status tab)
+// =====================================================================
+
+export interface Wc2026ModelEvaluation {
+  accuracy: number;
+  log_loss: number;
+  brier: number;
+  pred_draw_rate: number;
+  n_matches: number;
+  evaluated_at: string;
+  /**
+   * `in_sample`            — metrics were baked into the artifact at
+   *                          training time (the common case after a
+   *                          fresh retrain).
+   * `in_sample_recomputed` — the loaded artifact predated the bake-in
+   *                          feature so the server re-derived them at
+   *                          first request. Semantically identical, but
+   *                          the UI can surface a small hint if desired.
+   */
+  evaluation_kind: 'in_sample' | 'in_sample_recomputed' | string;
+}
+
+export interface Wc2026ModelStatus {
+  status: 'ready' | 'unavailable' | string;
+  model_version: string | null;
+  /**
+   * The version tag of whichever model is actually serving requests
+   * right now. Equals `model_version` when the BT artifact is loaded;
+   * falls back to `fifa_elo_v1` when only the Phase-1 fallback is live.
+   */
+  serving_with: string;
+  teams_count: number | null;
+  n_matches: number | null;
+  evaluation: Wc2026ModelEvaluation | null;
+}
+
+export const getWc2026ModelStatus = async (): Promise<Wc2026ModelStatus> => {
+  const response = await fetch(`${API_BASE_URL}/wc2026/model/status`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!response.ok) {
+    devError(
+      'WC2026 model status request failed:',
+      response.status,
+      response.statusText,
+    );
+    throw new Error('Unable to load WC2026 model status.');
+  }
+  return (await response.json()) as Wc2026ModelStatus;
 };
 
 // Teams API
