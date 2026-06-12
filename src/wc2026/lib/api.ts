@@ -833,6 +833,13 @@ export interface GroupMatchPrediction {
     predicted: string;
     confidence: string;
   };
+  // Mirrors `wc_fixtures.status` ('scheduled' | 'live' | 'completed').
+  // Backend only populates `home_goals` / `away_goals` for 'live' and
+  // 'completed' rows, so they can be safely treated as defined whenever
+  // `status` is one of those two values.
+  status?: 'scheduled' | 'live' | 'completed' | string;
+  home_goals?: number | null;
+  away_goals?: number | null;
 }
 
 export interface GroupPredictionsResponse {

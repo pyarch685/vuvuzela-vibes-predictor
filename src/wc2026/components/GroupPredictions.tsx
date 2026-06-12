@@ -70,6 +70,17 @@ export const GroupPredictions = ({ groupName }: GroupPredictionsProps) => {
   const winnerKey = buildItemKey('group_winner', groupName);
   const winnerUnlocked = unlocks.has(winnerKey);
 
+  // Helper: did the AI's predicted outcome match what actually happened?
+  // Returns null when we can't tell (missing prediction or scores).
+  const wasPredictionCorrect = (m: GroupMatchPrediction): boolean | null => {
+    if (!m.prediction || m.home_goals == null || m.away_goals == null) return null;
+    const actual =
+      m.home_goals > m.away_goals ? 'Home Win'
+      : m.home_goals < m.away_goals ? 'Away Win'
+      : 'Draw';
+    return m.prediction.predicted === actual;
+  };
+
   return (
     <div className="p-4 space-y-3 border-t border-border bg-background/40">
       {matches.map((m, idx) => {
@@ -77,8 +88,13 @@ export const GroupPredictions = ({ groupName }: GroupPredictionsProps) => {
         const isFree = idx < FREE_LIMIT;
         const unlocked = isFree || unlocks.has(itemKey);
         const label = `${m.home_team} vs ${m.away_team}`;
+        const isCompleted = m.status === 'completed' && m.home_goals != null && m.away_goals != null;
+        const isLive = m.status === 'live' && m.home_goals != null && m.away_goals != null;
 
-        if (!unlocked) {
+        // Past results are public information — never paywall a completed
+        // match. Pre-match predictions on unplayed fixtures stay gated so
+        // the paywall economics don't change.
+        if (!unlocked && !isCompleted) {
           return (
             <PaywallLock
               key={m.id}
@@ -90,44 +106,65 @@ export const GroupPredictions = ({ groupName }: GroupPredictionsProps) => {
           );
         }
 
+        const correct = isCompleted ? wasPredictionCorrect(m) : null;
+
         return (
           <div
             key={m.id}
             className="rounded-lg border border-border bg-card/60 p-3 text-sm"
           >
-            <div className="flex justify-between items-center mb-1">
+            <div className="flex justify-between items-center mb-1 gap-2">
               <span className="font-medium">{label}</span>
-              {isFree && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="text-[10px] uppercase tracking-wide text-accent cursor-help">
-                      Free
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    First 2 group predictions are free — preview the model before unlocking.
-                  </TooltipContent>
-                </Tooltip>
-              )}
+              <div className="flex items-center gap-2">
+                {isCompleted && (
+                  <span className="text-xs font-mono px-2 py-0.5 rounded bg-accent/15 text-accent border border-accent/30">
+                    Final {m.home_goals}–{m.away_goals}
+                  </span>
+                )}
+                {isLive && (
+                  <span className="text-xs font-mono px-2 py-0.5 rounded bg-red-500/15 text-red-400 border border-red-500/30 animate-pulse">
+                    Live {m.home_goals}–{m.away_goals}
+                  </span>
+                )}
+                {!isCompleted && !isLive && isFree && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-[10px] uppercase tracking-wide text-accent cursor-help">
+                        Free
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      First 2 group predictions are free — preview the model before unlocking.
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
             </div>
-            {m.prediction ? (
+            {/* Show the prediction row for any match where the user can see
+                it (unlocked OR completed). For completed matches, append a
+                ✓ / ✗ vs-actual badge so users can judge model accuracy. */}
+            {m.prediction && (unlocked || isCompleted) ? (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="flex gap-3 text-xs text-muted-foreground cursor-help">
+                  <div className="flex gap-3 text-xs text-muted-foreground cursor-help items-center">
                     <span>1: {(m.prediction.home_win * 100).toFixed(0)}%</span>
                     <span>X: {(m.prediction.draw * 100).toFixed(0)}%</span>
                     <span>2: {(m.prediction.away_win * 100).toFixed(0)}%</span>
                     <span className="ml-auto text-secondary font-semibold">
                       {m.prediction.predicted}
+                      {correct === true && <span className="ml-1 text-green-400">✓</span>}
+                      {correct === false && <span className="ml-1 text-red-400">✗</span>}
                     </span>
                   </div>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
-                  Home win • Draw • Away win probabilities from our AI model
+                  {isCompleted
+                    ? "Our pre-match model probabilities, with ✓/✗ vs the final result."
+                    : "Home win • Draw • Away win probabilities from our AI model"}
                 </TooltipContent>
               </Tooltip>
             ) : (
-              <p className="text-xs text-muted-foreground">Prediction pending</p>
+              !isCompleted && <p className="text-xs text-muted-foreground">Prediction pending</p>
             )}
           </div>
         );
