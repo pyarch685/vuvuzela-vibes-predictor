@@ -18,6 +18,18 @@ interface FixtureCardProps {
     predicted: string;
   };
   isHotMatch?: boolean;
+  /**
+   * Optional live/final scoreline. When `status === 'completed'` the card
+   * renders a "Final H–A" chip; when 'live', a pulsing "Live H–A" chip.
+   * Scheduled matches should omit this prop entirely.
+   */
+  result?: {
+    homeGoals: number;
+    awayGoals: number;
+    status: 'live' | 'completed';
+  };
+  /** Optional context badge, e.g. "Group A" — rendered next to the date. */
+  groupLabel?: string;
 }
 
 export const FixtureCard = ({
@@ -29,7 +41,20 @@ export const FixtureCard = ({
   venue,
   prediction,
   isHotMatch,
+  result,
+  groupLabel,
 }: FixtureCardProps) => {
+  // For completed matches, surface whether our pre-match prediction was
+  // correct as a ✓/✗ next to the predicted-outcome badge. Returns null
+  // when we can't tell (missing prediction or pre-result card).
+  const predictionCorrect = (() => {
+    if (!result || result.status !== 'completed' || !prediction) return null;
+    const actual =
+      result.homeGoals > result.awayGoals ? 'Home Win'
+      : result.homeGoals < result.awayGoals ? 'Away Win'
+      : 'Draw';
+    return prediction.predicted === actual;
+  })();
   return (
     <Card 
       className={cn(
@@ -64,17 +89,55 @@ export const FixtureCard = ({
             <span className="font-display text-lg text-foreground">{homeTeam}</span>
           </div>
           <div className="px-4">
-            <span className="font-display text-2xl text-secondary">VS</span>
+            {result ? (
+              <span
+                className={cn(
+                  'font-display text-2xl font-bold tabular-nums',
+                  result.status === 'live' ? 'text-red-400 animate-pulse' : 'text-accent',
+                )}
+              >
+                {result.homeGoals}–{result.awayGoals}
+              </span>
+            ) : (
+              <span className="font-display text-2xl text-secondary">VS</span>
+            )}
           </div>
           <div className="flex-1 text-right">
             <span className="font-display text-lg text-foreground">{awayTeam}</span>
           </div>
         </div>
 
-        {/* Date and Time */}
-        <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground mb-2">
+        {/* Status chip for live/completed matches sits just above the
+            date row so the scoreline above doesn't need to be re-explained. */}
+        {result && (
+          <div className="flex justify-center mb-2">
+            {result.status === 'completed' ? (
+              <Badge
+                variant="outline"
+                className="text-accent border-accent/40 bg-accent/10"
+              >
+                Final
+              </Badge>
+            ) : (
+              <Badge
+                variant="outline"
+                className="text-red-400 border-red-500/40 bg-red-500/10 animate-pulse"
+              >
+                ● Live
+              </Badge>
+            )}
+          </div>
+        )}
+
+        {/* Date, Time, optional Group */}
+        <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground mb-2 flex-wrap">
           <span>📅 {date}</span>
           <span>⏰ {time}</span>
+          {groupLabel && (
+            <span className="px-2 py-0.5 rounded border border-border text-xs">
+              {groupLabel}
+            </span>
+          )}
         </div>
 
         {venue && (
@@ -99,11 +162,27 @@ export const FixtureCard = ({
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge variant="outline" className="text-secondary border-secondary/50 cursor-help">
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'cursor-help',
+                      predictionCorrect === true
+                        ? 'text-green-400 border-green-500/50'
+                        : predictionCorrect === false
+                        ? 'text-red-400 border-red-500/50'
+                        : 'text-secondary border-secondary/50',
+                    )}
+                  >
                     📊 {prediction.predicted}
+                    {predictionCorrect === true && <span className="ml-1">✓</span>}
+                    {predictionCorrect === false && <span className="ml-1">✗</span>}
                   </Badge>
                 </TooltipTrigger>
-                <TooltipContent>Our most likely outcome based on team form</TooltipContent>
+                <TooltipContent>
+                  {result?.status === 'completed'
+                    ? 'Our pre-match pick — ✓/✗ vs the final result'
+                    : 'Our most likely outcome based on team form'}
+                </TooltipContent>
               </Tooltip>
             </div>
           </div>

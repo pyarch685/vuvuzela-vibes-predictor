@@ -826,6 +826,74 @@ export const getUserUnlocks = async (): Promise<string[]> => {
   }
 };
 
+// =====================================================================
+// WC2026 Tournament-wide Fixtures (used by /wc2026 Fixtures tab)
+// =====================================================================
+//
+// Backend contract:
+//   GET /wc2026/fixtures?days=7          -> Wc2026FixturesResponse
+//   GET /wc2026/fixtures?date=YYYY-MM-DD -> Wc2026FixturesResponse
+//
+// Public endpoint. Returns rows from `wc_fixtures` for the requested
+// window/day, ordered chronologically. Each row may include a FIFA-Elo
+// pre-match prediction; live/completed matches additionally carry
+// `home_goals` / `away_goals` so the UI can show the actual scoreline.
+
+export interface Wc2026Fixture {
+  id: number;
+  match_date: string;                    // ISO YYYY-MM-DD
+  kickoff_time?: string | null;          // "HH:MM" local to the stadium
+  group_name?: string | null;            // null for knockout rounds
+  stage: string;                         // "group", later "round_of_16" etc.
+  home_team: string;
+  away_team: string;
+  venue?: string | null;
+  status: 'scheduled' | 'live' | 'completed' | string;
+  home_goals?: number | null;
+  away_goals?: number | null;
+  prediction?: {
+    home_win: number;
+    draw: number;
+    away_win: number;
+    predicted: string;
+    confidence: string;
+  } | null;
+}
+
+export interface Wc2026FixturesResponse {
+  fixtures: Wc2026Fixture[];
+  date_from: string;                     // ISO YYYY-MM-DD
+  date_to: string;                       // ISO YYYY-MM-DD
+  count: number;
+}
+
+export const getWc2026Fixtures = async (
+  opts: { days?: number; date?: string } = {},
+): Promise<Wc2026FixturesResponse | null> => {
+  const params = new URLSearchParams();
+  if (opts.date) {
+    params.set('date', opts.date);
+  } else if (opts.days != null) {
+    params.set('days', String(opts.days));
+  }
+  const query = params.toString();
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/wc2026/fixtures${query ? `?${query}` : ''}`,
+      { method: 'GET', headers: { 'Content-Type': 'application/json' } },
+    );
+    if (!response.ok) {
+      devError('WC2026 fixtures request failed:', response.status, response.statusText);
+      return null;
+    }
+    return await response.json();
+  } catch (err) {
+    devError('WC2026 fixtures fetch error', err);
+    return null;
+  }
+};
+
+
 export interface GroupMatchPrediction {
   id: number;
   home_team: string;
