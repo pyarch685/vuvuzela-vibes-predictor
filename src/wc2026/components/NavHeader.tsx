@@ -276,17 +276,17 @@ export const NavHeader = () => {
             <>
               {/* Login Dialog */}
               <Dialog open={isLoginOpen} onOpenChange={setIsLoginOpen}>
-            <DialogTrigger asChild>
-              <Tooltip>
-                <TooltipTrigger asChild>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DialogTrigger asChild>
                   <Button variant="ghost" size="sm" className="gap-2">
                     <LogIn className="h-4 w-4" />
                     <span className="hidden sm:inline">Login</span>
                   </Button>
-                </TooltipTrigger>
-                <TooltipContent>Sign in to save predictions and unlock content</TooltipContent>
-              </Tooltip>
-            </DialogTrigger>
+                </DialogTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Sign in to save predictions and unlock content</TooltipContent>
+            </Tooltip>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 font-display">
@@ -387,17 +387,17 @@ export const NavHeader = () => {
 
           {/* Register Dialog */}
           <Dialog open={isRegisterOpen} onOpenChange={setIsRegisterOpen}>
-            <DialogTrigger asChild>
-              <Tooltip>
-                <TooltipTrigger asChild>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DialogTrigger asChild>
                   <Button variant="outline" size="sm" className="gap-2 border-primary/50 hover:bg-primary/10">
                     <User className="h-4 w-4" />
                     <span className="hidden sm:inline">Register</span>
                   </Button>
-                </TooltipTrigger>
-                <TooltipContent>Create a free account to start predicting</TooltipContent>
-              </Tooltip>
-            </DialogTrigger>
+                </DialogTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Create a free account to start predicting</TooltipContent>
+            </Tooltip>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 font-display">
