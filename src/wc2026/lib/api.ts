@@ -664,6 +664,98 @@ export const getBenchmarkResults = async (): Promise<BenchmarkResponse> => {
   return response.json();
 };
 
+// ---------- WC2026 benchmark ------------------------------------------------
+
+/**
+ * Snapshot kind disclosed by GET /wc2026/benchmark.
+ *
+ * - `pre_match`   the snapshot was taken before the fixture's kickoff.
+ *                 This is the honest, trustworthy subset.
+ * - `retroactive` the snapshot was taken after kickoff using the
+ *                 un-retrained pre-tournament BT artifact. Defensible
+ *                 (the artifact is offline-trained) but flagged so the
+ *                 UI can isolate the honest subset.
+ */
+export type Wc2026SnapshotKind = 'pre_match' | 'retroactive';
+
+export interface Wc2026BenchmarkBucketAccuracy {
+  confidence: string;
+  accuracy: number;
+  count: number;
+}
+
+export interface Wc2026BenchmarkPeriodAccuracy {
+  period: string;
+  accuracy: number;
+  correct: number;
+  total: number;
+}
+
+export interface Wc2026BenchmarkKindAccuracy {
+  snapshot_kind: Wc2026SnapshotKind | string;
+  total: number;
+  correct: number;
+  incorrect: number;
+  accuracy: number;
+}
+
+export interface Wc2026BenchmarkSummary {
+  total_matches: number;
+  correct: number;
+  incorrect: number;
+  pending: number;
+  accuracy: number;
+  accuracy_by_kind: Wc2026BenchmarkKindAccuracy[];
+  accuracy_by_confidence: Wc2026BenchmarkBucketAccuracy[];
+  accuracy_by_period: Wc2026BenchmarkPeriodAccuracy[];
+}
+
+export interface Wc2026BenchmarkMatch {
+  id: number;
+  fixture_id: number;
+  match_date: string;
+  kickoff_time: string | null;
+  group_name: string | null;
+  stage: string;
+  home_team: string;
+  away_team: string;
+  predicted_outcome: string;       // 'Home Win' | 'Draw' | 'Away Win'
+  actual_outcome: string | null;
+  actual_score: string | null;
+  correct: boolean | null;
+  confidence: string;              // 'Low' | 'Medium' | 'High'
+  snapshot_kind: Wc2026SnapshotKind | string;
+}
+
+export interface Wc2026BenchmarkResponse {
+  summary: Wc2026BenchmarkSummary;
+  matches: Wc2026BenchmarkMatch[];
+  /**
+   * Holdout-evaluation block reused from /wc2026/model/status. Always
+   * useful as a baseline alongside live tournament results.
+   */
+  holdout: Wc2026ModelEvaluation | null;
+  message?: string | null;
+}
+
+export const getWc2026BenchmarkResults = async (): Promise<Wc2026BenchmarkResponse> => {
+  const response = await fetch(`${API_BASE_URL}/wc2026/benchmark`, {
+    method: 'GET',
+    headers: authHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    devError('WC2026 benchmark request failed:', response.status, errorText);
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Session expired. Please log in again.');
+    }
+    throw new Error('Unable to load WC2026 benchmark data. Please try again later.');
+  }
+
+  return (await response.json()) as Wc2026BenchmarkResponse;
+};
+
 export const triggerScrapeRefresh = async (wait = false): Promise<{ message: string }> => {
   const url = `${API_BASE_URL}/scrape/refresh${wait ? '?wait=true' : ''}`;
   const response = await fetch(url, {
